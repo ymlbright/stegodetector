@@ -22,12 +22,11 @@ logging.addLevelName(CustomLoggingLevel.ASCII_DATA, "ASCII DATA")
 logging.addLevelName(CustomLoggingLevel.OTHER_DATA, "OTHER DATA")
 logging.addLevelName(CustomLoggingLevel.EXTRA_DATA, "EXTRA DATA")
 logging.addLevelName(CustomLoggingLevel.STEGO_DATA, "STEGO DATA")
-logging.addLevelName(CustomLoggingLevel.IMAGE_INFO, "IMAGE DATA")
+logging.addLevelName(CustomLoggingLevel.IMAGE_INFO, "IMAGE INFO")
 
 stream_handler = ColorizingStreamHandler(sys.stdout)
 stream_handler.level_map[logging.getLevelName("BASIC DEBUG")] = (None, "cyan", False)
 stream_handler.level_map[logging.getLevelName("IMAGE DEBUG")] = (None, "magenta", False)
-
 
 formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s', \
 			'%H:%M:%S')    
@@ -35,4 +34,4 @@ stream_handler.setFormatter(formatter)
 
 
 LOGGER = logging.getLogger('StegoDetector')
-LOGGER.setLevel(0)
+LOGGER.setLevel(1)

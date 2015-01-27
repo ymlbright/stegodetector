@@ -14,7 +14,7 @@ class StegoDetector():
 	filePath = ''
 
 	# report output level to stdout
-	reportLevel = 0
+	reportLevel = 1
 
 	# write all log to a specified file
 	logPath = False
@@ -36,7 +36,7 @@ class StegoDetector():
 		}
 
 	# init detect params
-	def __init__(self, filePath='', reportLevel=0, logPath=False, detectSensitive=1.0, fileType='', fastMod=False):
+	def __init__(self, filePath='', reportLevel=1, logPath=False, detectSensitive=1.0, fileType='', fastMod=False):
 		self.filePath = filePath
 		self.reportLevel = reportLevel
 		self.logPath = logPath
@@ -53,7 +53,8 @@ class StegoDetector():
 		self.fileOject =  FileObject(self.filePath)
 
 		print self.fileOject
-		
+	 	LOGGER.log(CustomLoggingLevel.BASIC_DEBUG,"common 内和主框架调试信息")
+
 		if self.fileType == '':
 			self.fileType = self.fileOject.type
 		else:
