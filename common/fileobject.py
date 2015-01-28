@@ -85,7 +85,6 @@ class FileObject():
 			for i in range(self.markBit):
 				if buffFlag:
 					if self.redundancyMark[index] & (1<<i) != 0:
-						print 0, i, start, length
 						buffFlag = False
 						self.fileHandler.seek(start)
 						data.append(self.fileHandler.read(length+1))
