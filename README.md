@@ -2,6 +2,10 @@
 find stegography in bmp, jpg, gif and png files
 
 
-require
+Require
 - python version 2.7 32bit
-- python-magic 
+- file command required
+
+
+Caution:
+- fileObject.type is NOT multi-thread safe
