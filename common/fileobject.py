@@ -66,9 +66,10 @@ class FileObject():
             t = os.popen("file %s"%self.filePath)
         else:
             with open('tmp.tmp', 'wb') as f:
+                self.fileHandler.seek(0)
                 f.write(self.fileHandler.read())
             t = os.popen("file tmp.tmp")
-        return t.read()
+        return t.read()[:-1]
         #return magic.from_buffer(self.read(1024, 0))
 
     # mark the data which are read
@@ -127,3 +128,4 @@ if __name__ == '__main__':
     print bin(x.redundancyMark[0])
     print x.redundancy()
     print x.type()
+    print x.size

@@ -12,6 +12,8 @@ class BMPDetector():
 
     def __init__(self, fileObject):
         self.fileObject = fileObject
+
+    def start(self):
         self.version = struct.unpack('h',self.fileObject.read(2))[0]
         if self.version == 0:
             # ver 1
@@ -20,10 +22,7 @@ class BMPDetector():
             self.width, self.height, self.rowDataLength = struct.unpack('3h',self.fileObject.read(6))
             self.channel = int(struct.unpack('b',self.fileObject.read(1))[0])
             self.bitsPerPixel = int(struct.unpack('b',self.fileObject.read(1))[0])
-            self.padding = 32 - self.width * self.bitsPerPixel % 32
-            self.rowDataLength = (self.width*self.bitsPerPixel+self.padding)*self.height/8
-            LOGGER.log(CustomLoggingLevel.IMAGE_INFO, 'BMP(ver 1): %d*%dpx , channel: %d, fileLength: %d b, rowDataLength: %d b' % 
-                        (self.width, self.height, self.channel, self.fileObject.size, self.rowDataLength) )
+            self.headerLength = 10
 
         elif self.version == 0x4D42:
             # ver 2  3  4
@@ -35,20 +34,19 @@ class BMPDetector():
 
             # read bitmap header
             bitmapHeaderLength = struct.unpack('l',self.fileObject.read(4))[0]
-            self.width, self.height, self.channel, self.bitsPerPixel = struct.unpack('2l2h',self.fileObject.read(12))
-            if self.bitsPerPixel != 24:
-                self.numberOfEntries = 1 << self.bitsPerPixel
-            else:
-                self.numberOfEntries = 0
-
+            
             if bitmapHeaderLength == 12:
                 # ver 2
                 self.version = 2
+                self.width, self.height, self.channel, self.bitsPerPixel = struct.unpack('4h',self.fileObject.read(8))
+                self.headerLength = 26
             elif bitmapHeaderLength == 40:
                 # ver 3
                 self.version = 3
+                self.width, self.height, self.channel, self.bitsPerPixel = struct.unpack('2l2h',self.fileObject.read(12))
                 self.compressionMethod, self.bitmapLength = struct.unpack('2L',self.fileObject.read(8))
                 self.fileObject.read(16) # skip useless header
+                self.headerLength = 53
             elif bitmapHeaderLength == 108:
                 # ver 4
                 self.version = 4
@@ -56,44 +54,81 @@ class BMPDetector():
                 LOGGER.error('Unknown BMP file version.')
 
             if self.version != 0x4D42:
+                # calculate number of entries
+                if self.bitsPerPixel < 24:
+                    self.numberOfEntries = 1 << self.bitsPerPixel
+                else:
+                    self.numberOfEntries = 0
+
                 # read color palette
                 self.colorPalette = []
                 for i in range(self.numberOfEntries):
-                    t = {}
-                    t['B'], t['G'], t['R'], reserved = struct.unpack('4b',self.fileObject.read(4))
+                    self.headerLength += 4
+                    t = self.fileObject.read(4)
                     self.colorPalette.append(t)
-                    if reserved != 0:
-                        LOGGER.log(CustomLoggingLevel.OTHER_DATA, 'Color palette reserved option is not 0, is 0x%x!',ord(reserved))
-
-                self.rowDataLength = 0
-                LOGGER.log(CustomLoggingLevel.IMAGE_INFO, 'BMP(ver %d): %d*%dpx , channel: %d, fileLength: %d b, rowDataLength: - b' % 
-                            (self.version, self.width, self.height, self.channel, self.fileObject.size) )
+                    if t[3] != '\x00':
+                        LOGGER.log(CustomLoggingLevel.OTHER_DATA, 'Color palette reserved option(alpha) is not 0, is 0x%x!',ord(reserved))
         else:
             LOGGER.error('Magic value BM check failed.')
+
+        self.padding = self.width * self.bitsPerPixel % 32
+        if self.padding != 0:
+            self.padding = 32 - self.padding 
+        self.rowDataLength = (self.width*self.bitsPerPixel+self.padding)*self.height/8
+        LOGGER.log(CustomLoggingLevel.IMAGE_INFO, 'BMP(ver %d): %d*%dpx , channel: %d, fileLength: %d(%d) b, headerLength: %d b, rowDataLength: %d b' % 
+                    (self.version, self.width, self.height, self.channel, self.fileObject.size, self.headerLength+self.rowDataLength, self.headerLength, self.rowDataLength) )
 
         if self.channel != 1:
             LOGGER.log(CustomLoggingLevel.IMAGE_INFO, 'Warning: bmpfile channel is NOT 1!')
 
+    # read bitmap for  ver 1
     def rowdata_ver1(self):
         if self.fileObject.size - self.rowDataLength - 10 > 10*(1 - detectSensitive):
             LOGGER.log(CustomLoggingLevel.EXTRA_DATA, 'Some extra data may in end of the file.')
         LOGGER.error('BMP file version 1 is not surported.')
 
+    # read bitmap for  ver 4
     def rowdata_ver4(self):
         LOGGER.error('BMP file version 4 is not surported.')
 
+    # read bitmap for  ver 2 and ver 3
     def rowdata_ver23(self):
-        pass
+        rowData = []
+        if self.compressionMethod != 0:
+            # decompress bitmap data according to compression method
+            if self.bitmapLength == 0:
+                LOGGER.warning('BitmapLength shouldn\'t be 0 in bitmap header! There may have some extra data in end of the file.')
+                data = self.fileObject.read(self.fileObject.size - self.headerLength)
+            else:
+                data = self.fileObject.read(self.rowDataLength)
+            # decompress
+
+        if self.compressionMethod ==0 and self.bitmapLength !=0:
+            LOGGER.warning('BitmapLength should be 0 in bitmap header! Image pixel may be processed with wrong compress method!')
+        if self.bitsPerPixel >= 24:
+            # return row data from stream 
+            return self.fileObject.read(self.rowDataLength)
+        elif self.bitsPerPixel in [1, 4, 8]:
+            # get rowdata from color palette
+            mask = {1 :0b1, 4 :0b1111, 8 :0b11111111 }
+            data = self.fileObject.read(self.rowDataLength)
+            for i in range(self.rowDataLength):
+                d = ord(data[i])
+                for j in range(8/self.bitsPerPixel):
+                    rowData.append(self.colorPalette[ (d>>j) & mask[self.bitsPerPixel] ])
+        else:
+            LOGGER.error('BMP file bits per pixel is not in (1, 4, 8) or >= 24.')
 
     def detect(self):
+        self.start()
 
-        LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG,"BMP型图像调试信息")
-        LOGGER.log(CustomLoggingLevel.ASCII_DATA,"连续 ASCII 或 可见字符")
-        LOGGER.log(CustomLoggingLevel.OTHER_DATA,"其它数据")
-        LOGGER.log(CustomLoggingLevel.EXTRA_DATA,"在文件尾部或中间发现多余数据")
-        LOGGER.log(CustomLoggingLevel.STEGO_DATA,"发现隐写数据")
-        LOGGER.log(CustomLoggingLevel.IMAGE_INFO,"输出图像基本信息")
+        # LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG,"BMP型图像调试信息")
+        # LOGGER.log(CustomLoggingLevel.ASCII_DATA,"连续 ASCII 或 可见字符")
+        # LOGGER.log(CustomLoggingLevel.OTHER_DATA,"其它数据")
+        # LOGGER.log(CustomLoggingLevel.EXTRA_DATA,"在文件尾部或中间发现多余数据")
+        # LOGGER.log(CustomLoggingLevel.STEGO_DATA,"发现隐写数据")
+        # LOGGER.log(CustomLoggingLevel.IMAGE_INFO,"输出图像基本信息")
 
-        LOGGER.warning("警告信息")
-        LOGGER.error("错误信息")
+        # LOGGER.warning("警告信息")
+        # LOGGER.error("错误信息")
         return ['','','']
