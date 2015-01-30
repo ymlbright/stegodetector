@@ -53,7 +53,7 @@ class StegoDetector():
         self.fileOject =  FileObject(self.filePath)
 
         print self.fileOject
-         LOGGER.log(CustomLoggingLevel.BASIC_DEBUG,"common 内和主框架调试信息")
+        LOGGER.log(CustomLoggingLevel.BASIC_DEBUG,"common 内和主框架调试信息")
 
         if self.fileType == '':
             self.fileType = self.fileOject.type
