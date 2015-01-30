@@ -16,6 +16,17 @@ class CustomLoggingLevel:
     STEGO_DATA = 47
     IMAGE_INFO = 50
 
+class ErrorHandler(logging.Handler):
+    ignoreError = False
+
+    def __init__(self):
+        logging.Handler.__init__(self)
+
+    def emit(self, record):
+        if record.levelno == 40 and self.ignoreError == False:
+            exit(1)
+
+
 logging.addLevelName(CustomLoggingLevel.BASIC_DEBUG, "BASIC DEBUG")
 logging.addLevelName(CustomLoggingLevel.IMAGE_DEBUG, "IMAGE DEBUG")
 logging.addLevelName(CustomLoggingLevel.ASCII_DATA, "ASCII DATA")
@@ -32,6 +43,8 @@ formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s', \
             '%H:%M:%S')    
 stream_handler.setFormatter(formatter)
 
+errorHandler = ErrorHandler()
 
 LOGGER = logging.getLogger('StegoDetector')
 LOGGER.setLevel(1)
+

@@ -47,8 +47,9 @@ class StegoDetector():
     # start to detect a image file
     def start(self):
         stream_handler.setLevel(self.reportLevel)
+        errorHandler.ignoreError = False
         LOGGER.addHandler(stream_handler)
-
+        LOGGER.addHandler(errorHandler)
 
         self.fileOject =  FileObject(self.filePath)
 

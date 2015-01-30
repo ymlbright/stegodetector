@@ -116,7 +116,7 @@ class FileObject():
             return data
 
     def __str__(self):
-        return "FileObject(accessTime=%s, editTime=%s, createTime=%s, size=%s, fileHandler=%s)"%(
+        return "<FileObject: accessTime=%s, editTime=%s, createTime=%s, size=%s, fileHandler=%s>"%(
                 self.accessTime, self.editTime, self.createTime, self.size, self.fileHandler)
 
 if __name__ == '__main__':
