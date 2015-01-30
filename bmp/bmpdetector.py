@@ -37,11 +37,13 @@ class BMPDetector():
             bitmapLength = struct.unpack('i',self.fileObject.read(4, bitmapOffset))
             if bitmapLength == 12:
                 # ver 2
-
+                pass
             elif bitmapLength == 40:
                 # ver 3
+                pass
             elif bitmapLength == 108:
                 # ver 4
+                pass
             else:
                 LOGGER.error('Unknown BMP file version.')
         else:
