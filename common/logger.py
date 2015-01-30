@@ -7,14 +7,16 @@ import sys
 import logging
 from ansistrm import ColorizingStreamHandler
 
+
 class CustomLoggingLevel:
-	BASIC_DEBUG = 2
-	IMAGE_DEBUG = 5
-	ASCII_DATA = 42
-	OTHER_DATA = 44
-	EXTRA_DATA = 45
-	STEGO_DATA = 47
-	IMAGE_INFO = 50
+    BASIC_DEBUG = 2
+    IMAGE_DEBUG = 5
+    ASCII_DATA = 42
+    OTHER_DATA = 44
+    EXTRA_DATA = 45
+    STEGO_DATA = 47
+    IMAGE_INFO = 50
+
 
 logging.addLevelName(CustomLoggingLevel.BASIC_DEBUG, "BASIC DEBUG")
 logging.addLevelName(CustomLoggingLevel.IMAGE_DEBUG, "IMAGE DEBUG")
@@ -29,9 +31,8 @@ stream_handler.level_map[logging.getLevelName("BASIC DEBUG")] = (None, "cyan", F
 stream_handler.level_map[logging.getLevelName("IMAGE DEBUG")] = (None, "magenta", False)
 
 formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s', \
-			'%H:%M:%S')    
+                              '%H:%M:%S')
 stream_handler.setFormatter(formatter)
-
 
 LOGGER = logging.getLogger('StegoDetector')
 LOGGER.setLevel(1)
