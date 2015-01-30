@@ -7,4 +7,4 @@ import os
 # scan stego software magic mark
 
 def fastscan(fileObject, fileType):
-	pass
+    pass
