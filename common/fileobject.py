@@ -121,11 +121,11 @@ class FileObject():
         return "<FileObject: accessTime=%s, editTime=%s, createTime=%s, size=%s, fileHandler=%s>"%(
                 self.accessTime, self.editTime, self.createTime, self.size, self.fileHandler)
 
-    def read_int8(self,start=-1):
-        return struct.unpack("b",self.read(1,start))[0]
+    def read_uint8(self, start=-1):
+        return struct.unpack("B", self.read(1,start))[0]
 
-    def read_int16(self,start=-1):
-        return struct.unpack("h",self.read(2,start))[0]
+    def read_uint16(self, start=-1):
+        return struct.unpack("H", self.read(2,start))[0]
 
 
 
