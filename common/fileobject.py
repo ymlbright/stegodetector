@@ -8,6 +8,7 @@ import cStringIO
 #import magic
 from time import localtime, strftime
 from logger import LOGGER, CustomLoggingLevel
+import struct
 
 class FileObject():
     # init with filepath or bytes
@@ -119,6 +120,14 @@ class FileObject():
     def __str__(self):
         return "<FileObject: accessTime=%s, editTime=%s, createTime=%s, size=%s, fileHandler=%s>"%(
                 self.accessTime, self.editTime, self.createTime, self.size, self.fileHandler)
+
+    def read_int8(self,start=-1):
+        return struct.unpack("b",self.read(1,start))[0]
+
+    def read_int16(self,start=-1):
+        return struct.unpack("h",self.read(2,start))[0]
+
+
 
 if __name__ == '__main__':
     x = FileObject('0123456789')
