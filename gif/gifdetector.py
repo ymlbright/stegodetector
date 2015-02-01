@@ -35,14 +35,13 @@ class GIFDetector():
             for j in range(3):  # 0 red 1 green 2 blue
                 self.globalColorTable[i][j] = file_object.read_uint8()
         self.images = []
-        self.control = []
+        image = {}
         while True:
             tag = file_object.read_uint8()
             if tag == 59:
                 break  # end of gif
 
-            if tag == 0b00101100:  # start of a image
-                image = {}
+            if tag == 0b00101100:  # start of a image descriptor
                 image.xOffset = file_object.read_uint16()
                 image.yOffset = file_object.read_uint16()
                 image.width = file_object.read_uint16()
@@ -63,8 +62,6 @@ class GIFDetector():
                     for i in range(len(image.localColorTable)):
                         for j in range(3):  # 0 red 1 green 2 blue
                             image.localColorTable[i][j] = file_object.read_uint8()
-                self.images.append(image)
-
             elif tag == 0x21:  # Graphic Control Extension.
                 if self.version != "89a":
                     LOGGER.warning("not version 89a but has extension segment.")
@@ -95,14 +92,65 @@ class GIFDetector():
                     terminator = file_object.read_uint8()
                     if terminator != 0:
                         LOGGER.w("terminator in block Graphic Control Extension is not 0")
-                    self.control.append(control)
-                elif sub_tag == 0xFE: # Comment Extension.
-                    pass
-                elif sub_tag == 0x01: # plain text Extension
-                    pass
-                elif sub_tag == 0xFF: # Application Extension.
-                    pass
+                    image.control = control
+                elif sub_tag == 0xFE:  # Comment Extension.
+                    if "comment" not in image:
+                        image.comment = ""
+                    while True:
+                        tmp = file_object.read(1)
+                        if tmp == '\0':
+                            break
+                        image.comment += tmp
+                elif sub_tag == 0x01:  # plain text Extension
+                    block_size = file_object.read_uint8()
+                    if block_size != 12:
+                        LOGGER.warning("block size is not 12 in plain text")
+                    text = {}
+                    text.gridLeftPosition = file_object.read_uint16()
+                    text.gridTopPosition = file_object.read_uint16()
+                    text.textGridWidth = file_object.read_uint16()
+                    text.textGridHeight = file_object.read_uint16()
+                    text.characterCellWidth = file_object.read_uint8()
+                    text.characterCellHeight = file_object.read_uint8()
+                    text.textForegroundColorIndex = file_object.read_uint8()
+                    text.textBackgroundColorIndex = file_object.read_uint8()
+                    text.data = ""
+                    while True:
+                        tmp = file_object.read(1)
+                        if tmp == '\0':
+                            break
+                        text.data += tmp
+                    if "text" in image:
+                        LOGGER.warning("text already in image")
+                    image.text = text
+                elif sub_tag == 0xFF:  # Application Extension.
+                    block_size = file_object.read_uint8()
+                    if block_size != 11:
+                        LOGGER.warning("block size is not 11 in application extension")
+                    application = {}
+                    application.identifier = file_object.read(8)
+                    application.authenticationCode = file_object.read(3)
+                    application.data = ""
+                    while True:
+                        tmp = file_object.read(1)
+                        if tmp == '\0':
+                            break
+                        application.data += tmp
+                    if "application" in image:
+                        LOGGER.warning("application already in image")
+                    image.application = application
                 else:
                     LOGGER.warning("unknown extension")
-            else:  # TODO　analysis image data
-                pass
+            else:  # DATA
+                image.LZWMinimumCodeSize = file_object.read_uint8()
+                image.data = []
+                while True:
+                    data_size = file_object.read_uint8()
+                    if data_size == 0:
+                        break
+                    data = file_object.read(data_size)
+                    if "data" in image:
+                        LOGGER.warning("data already in image")
+                    image.data.append(data)
+                self.images.append(image)
+                image = {}
