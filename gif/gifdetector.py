@@ -50,7 +50,7 @@ class GIFDetector():
                 mask >>= 3
                 image.reserved = mask & 0b11
                 if image.reserved != 0:
-                    pass  # TODO show warning
+                    LOGGER.warning("reserved data should be 0")
                 mask >>= 2
                 image.sortFlag = mask & 0b1
                 mask >>= 1
