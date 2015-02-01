@@ -103,7 +103,7 @@ class FileObject():
                         if self.redundancyMark[index] & (1<<i) != 0:
                             buffFlag = False
                             self.fileHandler.seek(start)
-                            data.append(self.fileHandler.read(length+1))
+                            data.append({'start' :start, 'data' :self.fileHandler.read(length+1)})
                         else:
                             length += 1
                     else:
@@ -111,9 +111,9 @@ class FileObject():
                             buffFlag = True
                             start = index*self.markBit + i
                             length = 0
-            if buffFlag:
+            if buffFlag and start < self.size:
                 self.fileHandler.seek(start)
-                data.append(self.fileHandler.read(length))
+                data.append({'start' :start, 'data' :self.fileHandler.read(length)})
             return data
 
     def __str__(self):

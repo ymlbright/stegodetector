@@ -4,6 +4,7 @@
 # @Author  : yml_bright@163.com
 
 import struct
+from common.fileobject import FileObject
 from common.logger import LOGGER, CustomLoggingLevel
 
 class BMPDetector():
@@ -61,12 +62,15 @@ class BMPDetector():
                     self.numberOfEntries = 0
 
                 # read color palette
+                blockSize = 4
+                if self.version ==  3 and self.compressionMethod == 3:
+                    blockSize = 12
                 self.colorPalette = []
                 for i in range(self.numberOfEntries):
-                    self.headerLength += 4
-                    t = self.fileObject.read(4)
+                    self.headerLength += blockSize
+                    t = self.fileObject.read(blockSize)
                     self.colorPalette.append(t)
-                    if t[3] != '\x00':
+                    if blockSize == 4 and t[3] != '\x00':
                         LOGGER.log(CustomLoggingLevel.OTHER_DATA, 'Color palette reserved option(alpha) is not 0, is 0x%x!',ord(reserved))
         else:
             LOGGER.error('Magic value BM check failed.')
@@ -75,7 +79,7 @@ class BMPDetector():
         if self.padding != 0:
             self.padding = 32 - self.padding 
         self.rowDataLength = (self.width*self.bitsPerPixel+self.padding)*self.height/8
-        LOGGER.log(CustomLoggingLevel.IMAGE_INFO, 'BMP(ver %d): %d*%dpx , channel: %d, fileLength: %d(%d) b, headerLength: %d b, rowDataLength: %d b' % 
+        LOGGER.log(CustomLoggingLevel.IMAGE_INFO, 'BMP(ver %d): %d*%dpx , channel: %d, fileLength: 0x%x(0x%x) b, headerLength: %d b, rowDataLength: %d b' % 
                     (self.version, self.width, self.height, self.channel, self.fileObject.size, self.headerLength+self.rowDataLength, self.headerLength, self.rowDataLength) )
 
         if self.channel != 1:
@@ -98,20 +102,55 @@ class BMPDetector():
             # decompress bitmap data according to compression method
             if self.bitmapLength == 0:
                 LOGGER.warning('BitmapLength shouldn\'t be 0 in bitmap header! There may have some extra data in end of the file.')
-                data = self.fileObject.read(self.fileObject.size - self.headerLength)
+                tdata = self.fileObject.read(self.fileObject.size - self.headerLength)
             else:
-                data = self.fileObject.read(self.rowDataLength)
+                tdata = self.fileObject.read(self.bitmapLength)
             # decompress
+            data = []
+            if self.compressionMethod == 1:
+                specialFlag = -1
+                for i in range(len(tdata)):
+                    if specialFlag < 0:
+                        if specialFlag == -1:
+                            if tdata[i] == '\x00':
+                                pass # end of line
+                            elif tdata == '\x01':
+                                break # end of RLE data
+                            elif tdata[i] == '\x02':
+                                data.append('\x00'*(ord(tdata[i+1])+self.width*ord(tdata[i+2]))*self.bitsPerPixel/8)
+                            else:
+                                specialFlag = ord(tdata[i]) + 1
+                        specialFlag -= 1
+                        if specialFlag == -3:
+                            specialFlag = 0
+                    elif specialFlag == 0:
+                        if tdata[i] == '\x00':
+                            specialFlag = -1
+                    elif specialFlag > 1:
+                        data.append(tdata[i])
+                        specialFlag -= 1
+                    else:
+                        specialFlag -= 1
+                if i < len(tdata) - 1:
+                    self.showextradata(tdata[i:len(tdata)-1], self.headerLength + i)
+                data = ''.join(data)
+            elif self.compressionMethod == 2:
+                LOGGER.error('Compress method RLE4 of BMP file version 3 is not surported.')
+                return
+            elif self.compressionMethod == 3:
+                LOGGER.error('Compress method using RGB mask of BMP file version 3 is not surported.')
+                return
+        else:
+            data = self.fileObject.read(self.rowDataLength)
 
         if self.compressionMethod ==0 and self.bitmapLength !=0:
             LOGGER.warning('BitmapLength should be 0 in bitmap header! Image pixel may be processed with wrong compress method!')
         if self.bitsPerPixel >= 24:
             # return row data from stream 
-            return self.fileObject.read(self.rowDataLength)
+            return data
         elif self.bitsPerPixel in [1, 4, 8]:
             # get rowdata from color palette
             mask = {1 :0b1, 4 :0b1111, 8 :0b11111111 }
-            data = self.fileObject.read(self.rowDataLength)
             for i in range(self.rowDataLength):
                 d = ord(data[i])
                 for j in range(8/self.bitsPerPixel):
@@ -119,8 +158,25 @@ class BMPDetector():
         else:
             LOGGER.error('BMP file bits per pixel is not in (1, 4, 8) or >= 24.')
 
+    def showextradata(self, data, location):
+        if len(data) > 256:
+            tmpFileObject = FileObject(data)
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s'%(location, tmpFileObject.type()) )
+        else:
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s'%(location, data) )
+    
     def detect(self):
         self.start()
+        rowData = None
+        if self.version == 1:
+            rowData = self.rowdata_ver1()
+        elif self.version in [2, 3]:
+            rowData = self.rowdata_ver23()
+        elif self.version == 4:
+            rowData = self.rowdata_ver4()
+        for d in self.fileObject.redundancy():
+            self.showextradata(d['data'], d['start'])
+        return rowData, self.bitsPerPixel, 1
 
         # LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG,"BMP型图像调试信息")
         # LOGGER.log(CustomLoggingLevel.ASCII_DATA,"连续 ASCII 或 可见字符")
@@ -131,4 +187,3 @@ class BMPDetector():
 
         # LOGGER.warning("警告信息")
         # LOGGER.error("错误信息")
-        return ['','','']
