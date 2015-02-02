@@ -147,9 +147,14 @@ class BMPDetector():
             LOGGER.warning('BitmapLength should be 0 in bitmap header! Image pixel may be processed with wrong compress method!')
         if self.bitsPerPixel >= 24:
             # return row data from stream 
+            if self.bitsPerPixel == 32:
+                self.channel = 4
+            else:
+                self.channel = 3
             return data
         elif self.bitsPerPixel in [1, 4, 8]:
             # get rowdata from color palette
+            self.channel = 4
             mask = {1 :0b1, 4 :0b1111, 8 :0b11111111 }
             for i in range(self.rowDataLength):
                 d = ord(data[i])
@@ -176,7 +181,7 @@ class BMPDetector():
             rowData = self.rowdata_ver4()
         for d in self.fileObject.redundancy():
             self.showextradata(d['data'], d['start'])
-        return rowData, self.bitsPerPixel, 1
+        return rowData, self.bitsPerPixel, self.channel
 
         # LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG,"BMP型图像调试信息")
         # LOGGER.log(CustomLoggingLevel.ASCII_DATA,"连续 ASCII 或 可见字符")
