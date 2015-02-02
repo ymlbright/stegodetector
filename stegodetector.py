@@ -8,6 +8,7 @@ from common.fileobject import FileObject
 from common.fastscan import fastscan
 from common.logger import *
 from bmp.bmpdetector import BMPDetector
+from jpg.jpgdetector import JPGDetector
 
 class StegoDetector():
     # the file to detected
@@ -31,7 +32,7 @@ class StegoDetector():
     mimeMap = {
         #'png' : PNGDetector, 
         'bmp' : BMPDetector,
-        #'jpg' : JPGDetector,
+        'jpg' : JPGDetector,
         #'gif' : GIFDetector
         }
 
@@ -70,5 +71,5 @@ class StegoDetector():
 
             # do some check on rowdata
 
-t = StegoDetector(filePath='test.bmp', fileType='bmp')
+t = StegoDetector(filePath='test.jpg', fileType='jpg')
 t.start()
