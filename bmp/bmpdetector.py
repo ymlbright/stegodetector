@@ -21,8 +21,8 @@ class BMPDetector():
             # read file header
             self.version = 1
             self.width, self.height, self.rowDataLength = struct.unpack('3h',self.fileObject.read(6))
-            self.channel = int(struct.unpack('b',self.fileObject.read(1))[0])
-            self.bitsPerPixel = int(struct.unpack('b',self.fileObject.read(1))[0])
+            self.channel = ord(struct.unpack('b',self.fileObject.read(1))[0])
+            self.bitsPerPixel = ord(struct.unpack('b',self.fileObject.read(1))[0])
             self.headerLength = 10
 
         elif self.version == 0x4D42:
