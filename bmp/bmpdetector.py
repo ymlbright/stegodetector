@@ -30,7 +30,7 @@ class BMPDetector():
             # read file header
             self.length = struct.unpack('i',self.fileObject.read(4))[0]
             if self.fileObject.read(4) != '\x00\x00\x00\x00': # reserved always 0
-                LOGGER.log(CustomLoggingLevel.OTHER_DATA, 'File header reserved options is not 0')
+                LOGGER.log(CustomLoggingLevel.OTHER_DATA, '[0x%x] File header reserved options is not 0'%(self.fileObject.cur()-4))
             bitmapOffset = struct.unpack('i',self.fileObject.read(4))[0]
 
             # read bitmap header
@@ -52,7 +52,7 @@ class BMPDetector():
                 # ver 4
                 self.version = 4
             else:
-                LOGGER.error('Unknown BMP file version.')
+                LOGGER.error('[0x%x] Unknown BMP file version.'%(self.fileObject.cur()-4))
 
             if self.version != 0x4D42:
                 # calculate number of entries
@@ -71,7 +71,7 @@ class BMPDetector():
                     t = self.fileObject.read(blockSize)
                     self.colorPalette.append(t)
                     if blockSize == 4 and t[3] != '\x00':
-                        LOGGER.log(CustomLoggingLevel.OTHER_DATA, 'Color palette reserved option(alpha) is not 0, is 0x%x!',ord(reserved))
+                        LOGGER.log(CustomLoggingLevel.OTHER_DATA, '[0x%x] Color palette reserved option(alpha) is not 0, is 0x%x!'%(self.fileObject.cur()-blockSize, ord(reserved)))
         else:
             LOGGER.error('Magic value BM check failed.')
 
