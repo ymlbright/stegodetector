@@ -164,11 +164,11 @@ class BMPDetector():
             LOGGER.error('BMP file bits per pixel is not in (1, 4, 8) or >= 24.')
 
     def showextradata(self, data, location):
-        if len(data) > 256:
+        if len(data) > 128:
             tmpFileObject = FileObject(data)
             LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s'%(location, tmpFileObject.type()) )
         else:
-            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s'%(location, data) )
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] > %s'%(location, data) )
     
     def detect(self):
         self.start()
