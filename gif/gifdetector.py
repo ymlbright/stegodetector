@@ -115,16 +115,12 @@ class GIFDetector():
                     block_size = file_object.read_uint8()
                     if block_size != 12:
                         LOGGER.warning("block size is not 12 in plain text")
-                    text = {}
-                    text["gridLeftPosition"] = file_object.read_uint16()
-                    text["gridTopPosition"] = file_object.read_uint16()
-                    text["textGridWidth"] = file_object.read_uint16()
-                    text["textGridHeight"] = file_object.read_uint16()
-                    text["characterCellWidth"] = file_object.read_uint8()
-                    text["characterCellHeight"] = file_object.read_uint8()
-                    text["textForegroundColorIndex"] = file_object.read_uint8()
-                    text["textBackgroundColorIndex"] = file_object.read_uint8()
-                    text["data"] = ""
+                    text = {"gridLeftPosition": file_object.read_uint16(), "gridTopPosition": file_object.read_uint16(),
+                            "textGridWidth": file_object.read_uint16(), "textGridHeight": file_object.read_uint16(),
+                            "characterCellWidth": file_object.read_uint8(),
+                            "characterCellHeight": file_object.read_uint8(),
+                            "textForegroundColorIndex": file_object.read_uint8(),
+                            "textBackgroundColorIndex": file_object.read_uint8(), "data": ""}
                     while True:
                         tmp = file_object.read(1)
                         if tmp == '\0':
@@ -138,9 +134,7 @@ class GIFDetector():
                     block_size = file_object.read_uint8()
                     if block_size != 11:
                         LOGGER.warning("block size is not 11 in application extension")
-                    application = {}
-                    application["identifier"] = file_object.read(8)
-                    application["authenticationCode"] = file_object.read(3)
+                    application = {"identifier": file_object.read(8), "authenticationCode": file_object.read(3)}
                     data_size = file_object.read_uint8()
                     application["data"] = file_object.read(data_size)
 
@@ -169,3 +163,56 @@ class GIFDetector():
                     image["data"].append(data)
                 self.images.append(image)
                 image = {}
+
+    def intLZWTable(self,size):
+        table = [0]*(2**size+2)
+        for i in range(2**size):
+            table[i] = [i]
+        table[2**size] = "CC"
+        table[2*size+1] = "EOI"
+        return table
+
+    def lzwdecode(self, data, lzw_size):
+        output = []
+        lzwtable = self.intLZWTable(lzw_size)
+        code = data[0]
+        output.append(code)
+        for i in range(1, len(data)):
+            code = data[i]
+
+            if code < len(lzwtable):
+                output += lzwtable[code]
+                k = lzwtable[code][0]
+                tmp = lzwtable[data[i-1]]
+                tmp += [k]
+                lzwtable.append(tmp)
+            else:
+                k = lzwtable[data[i-1]][0]
+                out = lzwtable[data[i-1]] + [k]
+                output += out
+                lzwtable.append(out)
+        return output
+
+
+    # def detect(self):
+    #     data = []
+    #     for image in self.images:
+    #         colorTable = self.globalColorTable
+    #         if image["localColorTableFlag"] == 1:
+    #             colorTable = image["localColorTable"]
+    #         w = image["width"]
+    #         h = image["height"]
+    #         currentData = [[(0, 0, 0)] * w] * h
+    #         lzwtable = self.intLZWTable(image["LZWMinimumCodeSize"])
+    #         decoded = []
+    #         code = image["data"][0]
+    #         decoded.append(code)
+    #         for i in range(1, len(image["data"])):
+    #             code = image["data"][i]
+    #             if code in lzwtable:
+    #                 decoded += code
+    #                 k = lzwtable[code]
+    #                 lzwtable.append([image["data"][i-1],])
+
+
+
