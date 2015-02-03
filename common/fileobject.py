@@ -13,7 +13,12 @@ import struct
 class FileObject():
     # init with filepath or bytes
     def __init__(self, stream):
-        if os.path.isfile(stream):
+        try:
+            safeIsFile = os.path.isfile(stream)
+        except:
+            safeIsFile = False
+
+        if safeIsFile:
             try:
                 self.fileHandler = open(stream, 'rb')
             except IOError:
@@ -52,6 +57,8 @@ class FileObject():
         if self.fileHandler:
             if start >= 0:
                 self.streamCur = start
+            if self.streamCur+length > self.size:
+                length = self.size - self.streamCur
             self.fileHandler.seek(self.streamCur)
             self.domark(self.streamCur, length)
             self.streamCur += length
