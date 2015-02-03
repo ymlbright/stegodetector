@@ -3,19 +3,23 @@
 # @Date    : 2015-02-02 10:29:36
 # @Author  : yml_bright@163.com
 
-
 import struct
 from common.fileobject import FileObject
 from common.logger import LOGGER, CustomLoggingLevel
 
 class JPGDetector():
 
-    detectSensitive = 1.0
-    
     def __init__(self, fileObject):
         self.fileObject = fileObject
-        self.huffmanTable = []
-        self.quantizationTable = []
+        self.channel = 3
+        self.huffmanTable = {}
+        self.huffmanTableCount = 0
+        self.quantizationTable = {}
+        self.colorQuantization = {}
+        self.scanQuantization = {}
+        self.scanFlag = False
+        self.scanData = ''
+        self.restartInterval = 0
         self.tagMap = {
             '\xff\x00' :self.tag_none,
             '\xff\xc0' :self.tag_sof0,
@@ -85,29 +89,48 @@ class JPGDetector():
 
     def start(self):
         if self.fileObject.read(2) == '\xff\xd8': # start of JPEG file
-            pass
+            tag = self.fileObject.read(2)
+            while self.scanFlag == False and tag != None:
+                try:
+                    tag = self.tagMap[tag](tag)
+                except KeyError:
+                    tag = self.tag_unknown(tag)
+            data = []
+            d = self.fileObject.read(1)
+            while self.scanFlag == True:
+                if d == '\xff':
+                    n = self.fileObject.read(1)
+                    tag = d + n
+                    if n == '\x00':
+                        data.append(d)
+                    elif n == '\xd9':
+                        self.tag_eoi(tag)
+                    elif '\xd0' <= n <= '\xf7':
+                        self.tag_rst(tag)
+                    else:
+                        self.unexpected_tag(tag, '?')
+                else:
+                    data.append(d)
+                d = self.fileObject.read(1)
+            self.scanData = ''.join(data)
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO, 'JPEG (ver %d.%d): %d*%dpx , channel: %d, fileLength: 0x%x b, scanDataLength: 0x%x b' % 
+                        (self.version>>8, self.version&0xff, self.width, self.height, self.channel, self.fileObject.size, len(self.scanData)) )
         else:
             LOGGER.error('JPEG file start mark 0xFFD8 check failed.')
 
     def tag_none(self, tag):
-        # 0xFF00 means 0xFF in data
+        # 0xFF00 means 0xFF in scan data
         pass
 
     def tag_com(self, tag):
         # 0xFFFE Comment
-        data = []
-        d = self.fileObject.read(1)
-        while d != '\xff':
-            data.append(d)
-            d = self.fileObject.read(1)
-        LOGGER.log(CustomLoggingLevel.STEGO_DATA, '[0x%x] %s'%(self.fileObject.cur(), ''.join(data)))
-        return '\xff' + self.fileObject.read(1)
+        return self.reserve_tag()
 
     def tag_app0(self, tag):
         # 0xFFE0 APP0
-        length = self.fileObject.read_uint16()
+        length = self.read_uint16()
         magic = self.fileObject.read(5)
-        self.version = self.fileObject.read_uint16()
+        self.version = self.read_uint16()
         self.fileObject.read(5)
         self.thumbnailX = self.fileObject.read_uint8()
         self.thumbnailY = self.fileObject.read_uint8()
@@ -116,77 +139,156 @@ class JPGDetector():
 
     def tag_app(self, tag):
         # 0xFFE1~0xFFEE Application-specific
-        length = self.fileObject.read_uint16()
-        data = self.fileObject.read(length-2)
-        return self.find_tag('APP%d'%(int(tag)-0xFFE0))
+        appID = int(tag)-0xFFE0
+        length = self.read_uint16() - 2
+        data = self.fileObject.read(length)
+        if not appID in [1, 2, 13 ,14]:
+            LOGGER.log(CustomLoggingLevel.OTHER_DATA, '[0x%x] Tag APP%d found.'%(self.fileObject.cur() - length, appID))
+        else:
+            LOGGER.log(CustomLoggingLevel.OTHER_DATA, '[0x%x] Tag APP%d found, this tag usually not used in file.'%(self.fileObject.cur() - length, appID))
+        return self.find_tag('APP%d'%appID)
 
     def tag_jpg(self, tag):
         # 0xFFF0~0xFFFD JPGn extention reserve
-        pass
+        return self.reserve_tag()
 
     def tag_jpeg(self, tag):
         # 0xFFC8 JPEG extention reserve
-        pass
+        return self.reserve_tag()
 
     def tag_dhp(self, tag):
         # #FFDE Define hierarchical progression
-        pass
+        self.unsupported_tag('0xffde', 'DHP')
 
     def tag_exp(self, tag):
         # 0xFFDF Expand reference image(s)
-        pass
+        self.unsupported_tag('0xffdf', 'EXP')
 
     def tag_dqt(self, tag):
         # 0xFFDB Define Quantization Table(s)
-        pass
+        length = self.read_uint16() - 2
+        while length>0:
+            firstBit = self.fileObject.read_uint8()
+            tableID = firstBit & 0xf
+            tableLength = (firstBit >> 4 + 1) * 64
+            self.quantizationTable[tableID] = self.fileObject.read(tableLength)
+            length -= tableLength + 1
+        return self.find_tag('DQT')
 
     def tag_sof0(self, tag):
         # 0xFFC0 Start Of Frame 
-        length = self.fileObject.read_uint16()
+        length = self.read_uint16()
+        self.encodeType = 'sof0'
         self.bitsPerPixel = self.fileObject.read_uint8()
-        self.height = self.fileObject.read_uint16()
-        self.width = self.fileObject.read_uint16()
+        self.height = self.read_uint16()
+        self.width = self.read_uint16()
         if self.fileObject.read(1) != '\x03':
             LOGGER.error('[0x%x] Color type must be YCrCb(0x03) in JFIF.'%self.fileObject.cur())
-        self.comp = self.fileObject.read(9)
+        comp = self.fileObject.read(9)
+        for i in range(3):
+            self.colorQuantization[ord(comp[3*i])] = {'Horz' :ord(comp[3*i+1])>>4, 'Vert' :ord(comp[3*i+1])&0xf, 'Table' :ord(comp[3*i+2])}
         return self.find_tag('SOF0')
 
     def tag_sof(self, tag):
         # 0xFFC1~0xFFC7 0xFFC9~0xFFCF Start Of Frame 
-        pass
+        length = self.read_uint16()
+        self.encodeType = 'sofx'
+        self.bitsPerPixel = self.fileObject.read_uint8()
+        self.height = self.read_uint16()
+        self.width = self.read_uint16()
+        if self.fileObject.read(1) != '\x03':
+            LOGGER.error('[0x%x] Color type must be YCrCb(0x03) in JFIF.'%self.fileObject.cur())
+        comp = self.fileObject.read(9)
+        return self.find_tag('SOFx')
 
     def tag_dht(self, tag):
         # 0xFFC4 Define Huffman Table(s)
-        length = self.fileObject.read_uint16()
-        
+        length = self.read_uint16() - 2
+        while length>0:
+            tableIDByte = self.fileObject.read_uint8()
+            tableID = (tableIDByte>>4)+(tableIDByte&0xf)
+            if tableID<4:
+                length -= self.huffmantree_decode(tableID)+1
+            else:
+                LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] Unknown part of huffman table'%(self.fileObject.cur()-1))
+                self.fileObject.read(length) # skip unknown part
+                break
+        return self.find_tag('DHT')
+
+    def huffmantree_decode(self, tableID):
+        bitCount = []
+        powerLength = 0
+        self.huffmanTableCount += 1
+        if self.huffmanTableCount>4:
+            self.log(CustomLoggingLevel.IMAGE_INFO, 'Extra huffman table(DHT) found in jpg file.')
+        for i in range(16):
+            bitCount.append(ord(self.fileObject.read(1)))
+            powerLength += bitCount[i]
+        bitPower = self.fileObject.read(powerLength)
+        huffmanTree = {}
+        powerPos = 0
+        lastBit = 0
+        for i in range(16):
+            if bitCount[i] == 0:
+                if lastBit < 2**i:
+                    lastBit = lastBit << 1
+                continue
+            while bitCount[i]>0:
+                if i>1 and lastBit < 2**i:
+                    lastBit = lastBit << 1
+                huffmanTree[lastBit] = bitPower[powerPos]
+                lastBit += 1
+                powerPos += 1
+                bitCount[i] -= 1
+        self.huffmanTable[tableID] = huffmanTree
+        return powerLength+16
 
     def tag_dnl(self, tag):
         # 0xFFDC Define number of lines
-        pass
+        self.unsupported_tag('0xffdc', 'DNL')
 
     def tag_dri(self, tag):
         # 0xFFDD Define Restart Interval
-        pass
+        length = self.read_uint16() - 2
+        curPos = '[0x%x]' % self.fileObject.cur()
+        self.restartInterval = self.read_uint16()
+        if length != 2:
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '%s> %s'%(curPos, self.fileObject.read(length-2)))
+        return self.find_tag('DRI')
 
     def tag_sos(self, tag):
         # 0xFFDA Start Of Scan
-        pass
+        self.scanFlag = True
+        length = self.read_uint16() - 2
+        if self.fileObject.read(1) != '\x03':
+            LOGGER.error('[0x%x] Color type must be YCrCb(0x03) in JFIF.'%self.fileObject.cur())
+        comp = self.fileObject.read(3)
+        for i in range(3):
+            self.scanQuantization[i] = {'AC' :ord(comp[i])>>4, 'DC' :ord(comp[i])&0xf}
+        self.scanSs = self.fileObject.read(1)
+        self.scanSe = self.fileObject.read(1)
+        self.scanAh = ord(self.fileObject.read(1))
+        self.scanAl = self.scanAh & 0xf
+        self.scanAh = self.scanAh >> 4
 
     def tag_eoi(self, tag):
         # 0xFFD9 End Of Image
-        pass
+        self.scanFlag = False
 
     def tag_dac(self, tag):
         # 0xFFCC Define arithmetic conditioning table
-        pass
+        self.unsupported_tag('0xffcc', 'DAC')
 
     def tag_rst(self, tag):
         # 0xFFD0~0xFFD7 Restart
-        pass
+        if self.scanFlag == False:
+            self.unexpected_tag(tag, 'RST')
+        else:
+            pass
 
     def tag_res(self, tag):
         # 0xFF02~0xFFBF Reserve
-        pass
+        return self.reserve_tag()
 
     def tag_soi(self, tag):
         # 0xFFD0 Start Of Image
@@ -195,6 +297,11 @@ class JPGDetector():
     def tag_unknown(self, tag):
         # unknown tag
         LOGGER.log(CustomLoggingLevel.IMAGE_INFO, '[0x%x] Unknown tag 0x%x found.'%(tag, self.fileObject.cur()))
+
+    def read_uint16(self, start=-1):
+        high = ord(self.fileObject.read(1))<<8
+        low = ord(self.fileObject.read(1))
+        return high + low
 
     def find_tag(self, tagName):
         if self.fileObject.read(1) != '\xFF':
@@ -205,9 +312,50 @@ class JPGDetector():
             while d != '\xFF':
                 data.append(d)
                 d = self.fileObject.read(1)
-            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '%s %s'%(curPos, ''.join(data)))
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '%s> %s'%(curPos, ''.join(data)))
         return '\xff' + self.fileObject.read(1)
+
+    def reserve_tag(self):
+        curPos = '[0x%x]' % self.fileObject.cur()
+        length = self.read_uint16() - 2
+        data = self.fileObject.read(length)
+        LOGGER.log(CustomLoggingLevel.STEGO_DATA, '%s> %s'%(curPos, data))
+        return self.find_tag('RESERVED TAG')
+
+    def unsupported_tag(self, tag, tagName):
+        self.warning('[0x%x] tag %s(%s) is unsupported.'%(self.fileObject.cur(), tagName, tag.encode('hex')))
+        length = self.read_uint16() - 2
+        self.fileObject.read(length)
+        return self.find_tag(tagName)
+
+    def unexpected_tag(self, tag, tagName):
+        length = self.read_uint16()
+        LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] tag %s(%s) appears unexpected, length: %d.'%(self.fileObject.cur()-2, tagName, tag.encode('hex'), length))
+        self.fileObject.read(length-2)
+
+    def showextradata(self, data, location):
+        if len(data) > 128:
+            tmpFileObject = FileObject(data)
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s'%(location, tmpFileObject.type()) )
+        else:
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] > %s'%(location, data) )
+
+    def decode(self):
+        # decode scan data of sof0
+        return ''
 
     def detect(self):
         self.start()
-        return ['','','']
+        rowData = ''
+        if self.encodeType == 'sof0':
+            rowData = self.decode()
+        else:
+            LOGGER.warning('Only SOF0 is supported, scan data will not be decoded.')
+
+        for d in self.fileObject.redundancy():
+            self.showextradata(d['data'], d['start'])
+        return rowData, self.channel*8, self.channel
+
+
+# how does RST tag works?
+# how to decode sof0 scan data
