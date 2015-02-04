@@ -44,7 +44,7 @@ class FileObject():
         self.bitMap = [0, 1]
         for i in range(2, self.markBit+1):
             self.bitMap.append(self.bitMap[i-1] + 2**(i-1))
-        for i in range(0, self.size, self.markBit):
+        for i in range(0, self.size+1, self.markBit):
             self.redundancyMark.append(0)
 
     def __del__(self):
@@ -68,6 +68,10 @@ class FileObject():
     def cur(self):
         return self.streamCur
 
+    # change current file pointer
+    def change_cur(self, cur):
+        self.streamCur = cur
+
     # guess file MIME type return an ascii string
     def type(self):
         if self.filePath != '':
@@ -77,7 +81,7 @@ class FileObject():
                 self.fileHandler.seek(0)
                 f.write(self.fileHandler.read())
             t = os.popen("file tmp.tmp")
-        return t.read()[:-1]
+        return t.read()[9:-1]
         #return magic.from_buffer(self.read(1024, 0))
 
     # mark the data which are read
@@ -133,6 +137,9 @@ class FileObject():
 
     def read_uint16(self, start=-1):
         return struct.unpack("H", self.read(2,start))[0]
+
+    def read_uint32(self, start=-1):
+        return struct.unpack("l", self.read(4,start))[0]
 
 
 
