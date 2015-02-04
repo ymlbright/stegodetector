@@ -71,5 +71,5 @@ class StegoDetector():
 
             # do some check on rowdata
 
-t = StegoDetector(filePath='test.jpg', fileType='jpg')
+t = StegoDetector(filePath='test2.jpg', fileType='jpg')
 t.start()
