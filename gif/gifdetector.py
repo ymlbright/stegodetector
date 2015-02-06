@@ -33,9 +33,11 @@ class GIFDetector():
         if self.version == "89a":
             self.backgroundColorIndex = file_object.read_uint8()
             self.pixelAspectRatio = file_object.read_uint8()
-        self.globalColorTable = [[0, 0, 0]] * (2 ** (self.pixel + 1))
+        # self.globalColorTable = [[0, 0, 0]] * (2 ** (self.pixel + 1))
+        self.globalColorTable = [[0, 0, 0] for i in range(2 ** (self.pixel + 1))]
         LOGGER.info("global table size is %d" % len(self.globalColorTable))
         for i in range(len(self.globalColorTable)):
+
             for j in range(3):  # 0 red 1 green 2 blue
                 self.globalColorTable[i][j] = file_object.read_uint8()
         self.images = []
@@ -164,7 +166,7 @@ class GIFDetector():
                 self.images.append(image)
                 image = {}
 
-    def intLZWTable(self,size):
+    def intLZWTable(self, size):
         table = [0]*(2**size+2)
         for i in range(2**size):
             table[i] = [i]
@@ -175,15 +177,15 @@ class GIFDetector():
     def lzwdecode(self, data, lzw_size):
         output = []
         lzwtable = self.intLZWTable(lzw_size)
-        code = data[0]
+        code = ord(data[0])
         output.append(code)
         for i in range(1, len(data)):
-            code = data[i]
+            code = ord(data[i])
 
             if code < len(lzwtable):
                 output += lzwtable[code]
                 k = lzwtable[code][0]
-                tmp = lzwtable[data[i-1]]
+                tmp = lzwtable[ord(data[i-1])]
                 tmp += [k]
                 lzwtable.append(tmp)
             else:
@@ -197,6 +199,7 @@ class GIFDetector():
     def get_images(self):
         result = []
         for image in self.images:
+            print len(image["data"])
             data = self.lzwdecode(image["data"], image["LZWMinimumCodeSize"])
             color_table = self.globalColorTable
             if image["localColorTableFlag"] == 1:
@@ -204,10 +207,16 @@ class GIFDetector():
 
             w = image["width"]
             h = image["height"]
-            output = [[(0, 0, 0)] * w] * h
+            output = [[0, 0, 0] * w] * h
 
+            print len(data)
             for i in range(len(data)):
-                output[int(i/w)][int(i % w)] = color_table[ord(data[i])]
+                if type(data[i]) != int:
+                    print "!!!", i, data[i]
+                if data[i] >= len(color_table):
+                    print "!!!", i, data[i], len(color_table)
+
+                output[int(i/w)][int(i % w)] = color_table[data[i]]
             result.append(output)
         return result
 
