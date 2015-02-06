@@ -174,26 +174,29 @@ class GIFDetector():
         table[2*size+1] = [0]
         return table
 
-    def lzwdecode(self, data, lzw_size):
+    def lzwdecode(self, data, lzw_size, table=[]):
+        # http://www.stringology.org/DataCompression/lzw-d/index_en.html
         output = []
-        lzwtable = self.intLZWTable(lzw_size)
-        code = ord(data[0])
-        output.append(code)
-        for i in range(1, len(data)):
-            code = ord(data[i])
-
+        if table == []:
+            lzwtable = self.intLZWTable(lzw_size)
+        else:
+            lzwtable = table
+        data = [ord(i) for i in data]
+        tmp = []
+        phrase = []
+        for i in range(len(data)):
+            code = data[i]
             if code < len(lzwtable):
-                output += lzwtable[code]
-                k = lzwtable[code][0]
-                tmp = lzwtable[ord(data[i-1])]
-                tmp += [k]
-                lzwtable.append(tmp)
+                phrase = lzwtable[code]
+                output += phrase
+                if tmp+[phrase[0]] not in lzwtable:
+                    lzwtable.append(tmp + [phrase[0]])
             else:
-
-                k = lzwtable[ord(data[i-1])][0]
-                out = lzwtable[ord(data[i-1])] + [k]
-                output += out
-                lzwtable.append(out)
+                phrase = tmp + [tmp[0]]
+                output += phrase
+                if phrase not in lzwtable:
+                    lzwtable.append(phrase)
+            tmp = phrase
         return output
 
     def get_images(self):
