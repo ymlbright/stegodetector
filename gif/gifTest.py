@@ -24,12 +24,21 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(detector.pixelAspectRatio, 0)
 
         self.assertEqual(detector.globalColorTable.__len__(), 2**(detector.pixel+1))
-    def test_lzwdecode(self):
+
+        images = detector.get_images()
+        for image in images:
+            im = Image.new("RGB", (len(image[0]), len(image)))
+            for i in range(len(image)):
+                for j in range(len(image[i])):
+                    im.putpixel((i, j), image[i][j])
+            im.save(str(i)+".jpg")
+
+
+    def test_lzw(self):
+        data = [chr(i) for i in [1,1,2,4,3,4,9,5,11,2] ]
         detector = GIFDetector(FileObject("1.gif"))
-        input = [1, 6, 6, 2, 9, 9, 7]
-        output = detector.lzwdecode(input, 2)
-        print output
-        im = Image.open("1.gif")
+        res = detector.lzwdecode(data, 2, [0, [1], [2], [3]])
+        print res
 
 
 if __name__ == '__main__':
