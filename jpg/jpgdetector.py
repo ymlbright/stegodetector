@@ -21,6 +21,7 @@ class JPGDetector():
         self.scanFlag = False
         self.scanData = ''
         self.restartInterval = 0
+        self.bitStreamStart = 0
         self.tagMap = {
             '\xff\x00' :self.tag_none,
             '\xff\xc0' :self.tag_sof0,
@@ -411,36 +412,104 @@ class JPGDetector():
         vertCb = self.colorQuantization[3]['Vert']
         hmax = max([horzY, horzCr, horzCb])
         vmax = max([vertY, vertCr, vertCb])
-        baseY = 0
-        baseCr = 0
-        BaseCb = 0
+        self.baseY = 0
+        self.baseCr = 0
+        self.BaseCb = 0
         mcuData = []
 
-        data = []
-        LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, 'Start to decode scan data.')
-        d = self.fileObject.read(1)
-        while self.scanFlag == True:
-            if d == '\xff':
-                n = self.fileObject.read(1)
-                tag = d + n
-                if n == '\x00':
-                    data.append(d)
-                elif n == '\xd9':
-                    self.tag_eoi(tag)
-                elif '\xd0' <= n <= '\xf7':
-                    baseY = 0
-                    baseCr = 0
-                    BaseCb = 0
-                    self.tag_rst(tag)
-                else:
-                    self.unexpected_tag(tag, '?')
-            else:
-                data.append(d)
-            d = self.fileObject.read(1)
-        return ''.join(data)
+        # try to use C++ to decode ....
 
-    def read_bitstream(self, bitLength): 
-        pass
+        # self.streamBuffer = []
+        # LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, 'Start to decode scan data.')
+        # while self.scanFlag == True:
+        #     # read Y data
+        #     d = 0
+        #     for i in range(1,17):
+        #         if self.read_bitstream(i) in huffmanTableY_DC.keys():
+        #             d = self.read_bitstream(i, False)
+        #             break
+        #     # read DC part
+        #     dataLength = ord(huffmanTableY_DC[d])&0xf
+        #     d = self.read_bitstream(dataLength, False) # need to decode
+        #     if self.baseY == 0:
+        #         self.baseY = d
+        #     else:
+        #         self.baseY += d
+        #     dataY = [self.baseY for i in range(64)]
+        #     # read AC part
+        #     dataYIndex = 0
+        #     for i in range(63):
+        #         dataYIndex += 1
+        #         for i in range(1,17):
+        #             if self.read_bitstream(i) in huffmanTableY_AC.keys():
+        #                 d = self.read_bitstream(i, False)
+        #                 break
+        #         dataLength = ord(huffmanTableY_DC[d])&0xf
+        #         if dataLength == 0:
+        #             break
+        #         else:
+        #             d = self.read_bitstream(dataLength, False) # need to decode
+        #             skipLength = 0
+        #             dataYIndex += skipLength
+        #             dataY[dataYIndex] = self.baseY + d
+        #     mcuData.append([dataY, 0 , 0])
+
+        # return ''
+
+    # def read_bitstream(self, bitLength, checkFlag = True): 
+    #     if bitLength == 0:
+    #         return 0
+    #     while self.bitStreamStart > 7:
+    #         self.streamBuffer.remove(self.streamBuffer[0])
+    #         self.bitStreamStart -= 8
+    #     expendLength = len(self.streamBuffer)*8 - self.bitStreamStart - bitLength
+    #     while expendLength < 0:
+    #         d = self.fileObject.read(1)
+    #         if d == '\xff':
+    #             n = self.fileObject.read(1)
+    #             tag = d + n
+    #             if n == '\x00':
+    #                 self.streamBuffer.append(ord(d))
+    #                 expendLength += 8
+    #             elif n == '\xd9':
+    #                 self.tag_eoi(tag)
+    #             elif '\xd0' <= n <= '\xf7':
+    #                 if checkFlag == False:
+    #                     self.baseY = 0
+    #                     self.baseCr = 0
+    #                     self.BaseCb = 0
+    #                 # self.tag_rst(tag)
+    #             else:
+    #                 self.unexpected_tag(tag, '?')
+    #         else:
+    #             self.streamBuffer.append(ord(d))
+    #             expendLength += 8
+    #     bitNewStart = self.bitStreamStart + bitLength
+    #     if self.bitStreamStart + bitLength > 8:
+    #         ret = self.streamBuffer[0] & myBitStreamMaskR[8-self.bitStreamStart]
+    #         bitLength -= 8 - self.bitStreamStart
+    #     else:
+    #         ret = ((self.streamBuffer[0] & myBitStreamMaskL[self.bitStreamStart+bitLength]) >> (8 - self.bitStreamStart - bitLength)) & myBitStreamMaskR[bitLength]
+    #         bitLength = 0
+    #     streamIndex = 1
+    #     while bitLength >= 8:
+    #         ret = ret << 8
+    #         ret += self.streamBuffer[streamIndex]
+    #         streamIndex += 1
+    #         bitLength -= 8
+    #     if bitLength > 0 :
+    #         ret = ret << bitLength
+    #         ret += self.streamBuffer[streamIndex] & myBitStreamMaskL[bitLength]
+    #     if checkFlag == False:
+    #         self.bitStreamStart = bitNewStart
+    #     return ret
+
+    # def clean_bitstream_remainder(self):
+    #     remainder = self.streamBuffer[0] & myBitStreamMaskR[8-self.bitStreamStart]
+    #     if remainder != 0 and remainder != myBitStreamMaskR[8-self.bitStreamStart]:
+    #         LOGGER.log(CustomLoggingLevel.EXTRA_DATA, 'Scandata remainder is not equal, is %s'%bin(remainder))
+    #     self.streamBuffer.remove(self.streamBuffer[0])
+    #     self.bitStreamStart = 0
 
     def read_scandata(self):
         curPos = self.fileObject.cur()

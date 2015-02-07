@@ -333,3 +333,28 @@ exifEnumTag = {
 
 tiffEnumDataTypeLength = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 4]
 tiffEnumDataType = ['', 'ubyte', 'string', 'ushort', 'ulong', 'urational', 'byte', 'undefined', 'short', 'long', 'rational', 'float', 'double']
+
+myBitStreamMaskL = [
+    0,
+    0b10000000,
+    0b11000000,
+    0b11100000,
+    0b11110000,
+    0b11111000,
+    0b11111100,
+    0b11111100,
+    0b11111110,
+    0b11111111,
+]
+
+myBitStreamMaskR = [
+    0,
+    0b1,
+    0b11,
+    0b111,
+    0b1111,
+    0b11111,
+    0b111111,
+    0b1111111,
+    0b11111111,
+]
