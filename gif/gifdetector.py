@@ -8,6 +8,10 @@ import struct
 from common.logger import LOGGER, CustomLoggingLevel
 import logging
 
+class Image():
+    def __init__(self):
+        pass
+
 class GIFDetector():
     def __init__(self, file_object):
         LOGGER.addHandler(logging.StreamHandler())
@@ -166,38 +170,30 @@ class GIFDetector():
                 self.images.append(image)
                 image = {}
 
-    def intLZWTable(self, size):
-        table = [0]*(2**size+2)
-        for i in range(2**size):
-            table[i] = [i]
-        table[2**size] = [0]
-        table[2*size+1] = [0]
-        return table
 
-    def lzwdecode(self, data, lzw_size, table=[]):
-        # http://www.stringology.org/DataCompression/lzw-d/index_en.html
-        output = []
-        if table == []:
-            lzwtable = self.intLZWTable(lzw_size)
-        else:
-            lzwtable = table
-        data = [ord(i) for i in data]
-        tmp = []
-        phrase = []
-        for i in range(len(data)):
-            code = data[i]
-            if code < len(lzwtable):
-                phrase = lzwtable[code]
-                output += phrase
-                if tmp+[phrase[0]] not in lzwtable:
-                    lzwtable.append(tmp + [phrase[0]])
+    def lzwdecode(self, data, lzw_size):
+        # http://stackoverflow.com/questions/6834388/basic-lzw-compression-help-in-python
+        dict_size = 2 ** lzw_size
+        dictionary = dict((chr(i), chr(i)) for i in xrange(dict_size))
+
+        w = result = data.pop(0)
+        for k in data:
+            if k in dictionary:
+                entry = dictionary[k]
+            elif k == dict_size:
+                entry = w + w[0]
             else:
-                phrase = tmp + [tmp[0]]
-                output += phrase
-                if phrase not in lzwtable:
-                    lzwtable.append(phrase)
-            tmp = phrase
-        return output
+                raise ValueError('Bad compressed k: %s' % k)
+            result += entry
+
+            # Add w+entry[0] to the dictionary.
+            dictionary[dict_size] = w + entry[0]
+            dict_size += 1
+
+            w = entry
+
+        result = [ord(x) for x in result]
+        return result
 
     def get_images(self):
         result = []
@@ -210,17 +206,11 @@ class GIFDetector():
 
             w = image["width"]
             h = image["height"]
-            output = [[0, 0, 0] * w] * h
-
-            print len(data)
-            for i in range(len(data)):
-                if type(data[i]) != int:
-                    print "!!!", i, data[i]
-                if data[i] >= len(color_table):
-                    print "!!!", i, data[i], len(color_table)
-
-                output[int(i/w)][int(i % w)] = color_table[data[i]]
-            result.append(output)
+            cur = Image()
+            cur.w = w
+            cur.h = h
+            cur.data = [color_table[i] for i in data]
+            result.append(cur)
         return result
 
 
