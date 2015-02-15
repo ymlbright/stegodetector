@@ -25,9 +25,18 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(detector.pixelAspectRatio, 0)
 
         self.assertEqual(detector.globalColorTable.__len__(), 2**(detector.pixel+1))
+        # images = detector.get_images()
+        # cnt = 0
+        # for image in images:
+        #     self.assertEqual(image.w * image.h, len(image.data))
+        #     im = Image.new("RGB", (image.w, image.h))
+        #
+        #     im.putdata([(x[0], x[1], x[2]) for x in image.data])
+        #     im.save("%d.jpg" % cnt)
+        #     cnt += 1
 
-    def test_gif0(self):
-        detector = GIFDetector(FileObject("0.gif"))
+    def test_get_data(self):
+        detector = GIFDetector(FileObject("1.gif"))
         images = detector.get_images()
         cnt = 0
         for image in images:

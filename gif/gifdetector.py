@@ -212,12 +212,14 @@ class GIFDetector():
         clear_code = 2 ** lzw_size
         end_code = clear_code + 1
         while True:
-            if len(dictionary) + 1 == 2 ** code_length:
+            if len(dictionary) == 2 ** code_length and code_length < 12:
                 code_length += 1
                 print "new code_length ", code_length
             code = reader.read(code_length)
             if code == clear_code:  # cc
+                LOGGER.debug("clear code")
                 dictionary = self.build_lzw_table(2 ** lzw_size)
+                code_length = lzw_size + 1
             elif code == end_code:  # end
                 LOGGER.debug("end code find")
                 break
@@ -244,7 +246,7 @@ class GIFDetector():
             print len(image["data"])
 
             color_table = self.globalColorTable
-            if "localColorTableFlag" in image:
+            if "localColorTableFlag" in image and image["localColorTableFlag"] == 1:
                 color_table = image["localColorTable"]
             data = self.lzwdecode(image["data"], image["LZWMinimumCodeSize"])
             w = image["width"]
