@@ -28,16 +28,17 @@ class MyTestCase(unittest.TestCase):
         images = detector.get_images()
         cnt = 0
         for image in images:
+            self.assertEqual(image.w * image.h, len(image.data))
             im = Image.new("RGB", (image.w, image.h))
             im.putdata([(x[0], x[1], x[2]) for x in image.data])
             im.save("%d.jpg" % cnt)
             cnt += 1
 
-    def test_lzw(self):
-        detector = GIFDetector(FileObject("1.gif"))
-        data = ['T', 'O', 'B', 'E', 'O', 'R', 'N', 'O', 'T', 256, 258, 260, 265, 259, 261, 263]
-        decoded = detector.lzwdecode(data, 8)
-        self.assertEqual(decoded, [ord(c) for c in "TOBEORNOTTOBEORTOBEORNOT"])
+    # def test_lzw(self):
+    #     detector = GIFDetector(FileObject("1.gif"))
+    #     data = ['T', 'O', 'B', 'E', 'O', 'R', 'N', 'O', 'T', 256, 258, 260, 265, 259, 261, 263]
+    #     decoded = detector.lzwdecode(data, 8)
+    #     self.assertEqual(decoded, [ord(c) for c in "TOBEORNOTTOBEORTOBEORNOT"])
 
 if __name__ == '__main__':
     unittest.main()

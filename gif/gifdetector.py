@@ -8,9 +8,29 @@ import struct
 from common.logger import LOGGER, CustomLoggingLevel
 import logging
 
+
 class Image():
     def __init__(self):
         pass
+
+
+class CodeReader():
+    def __init__(self, data):
+        self.data = data
+        self.pos = 0
+        self.mask = 1
+
+    def read(self, length):
+        ans = 0
+        for i in xrange(length):
+            tmp = 0 if ord(self.data[self.pos]) & self.mask == 0 else 1
+            ans += tmp * (2 ** i)
+            self.mask *= 2
+            if self.mask == 2 ** 8:
+                self.mask = 1
+                self.pos += 1
+        return ans
+
 
 class GIFDetector():
     def __init__(self, file_object):
@@ -23,7 +43,7 @@ class GIFDetector():
         if self.version != '87a' and self.version != '89a':
             LOGGER.error("Invalid version")
         else:
-            LOGGER.info("version is "+self.version)
+            LOGGER.info("version is " + self.version)
         self.logicScreenWidth = file_object.read_uint16()
         self.logicScreenHeight = file_object.read_uint16()
         mask = file_object.read_uint8()
@@ -92,8 +112,8 @@ class GIFDetector():
                     mask >>= 1
                     control["disposalMethod"] = mask & 0b111
                     # 0 -   No disposal specified. The decoder is
-                    #           not required to take any action.
-                    #     1 -   Do not dispose. The graphic is to be left
+                    # not required to take any action.
+                    # 1 -   Do not dispose. The graphic is to be left
                     #           in place.
                     #     2 -   Restore to background color. The area used by the
                     #           graphic must be restored to the background color.
@@ -166,44 +186,65 @@ class GIFDetector():
                     if data_size == 0:
                         break
                     data = file_object.read(data_size)
-                    image["data"]+=data
+                    image["data"] += data
                 self.images.append(image)
                 image = {}
 
 
+    def build_lzw_table(self, size):
+        table = dict((i, [i]) for i in xrange(size))
+        table[size] = size  # cc
+        table[size + 1] = size + 1  # end
+        return table
+
     def lzwdecode(self, data, lzw_size):
         # http://stackoverflow.com/questions/6834388/basic-lzw-compression-help-in-python
-        dict_size = 2 ** lzw_size
-        dictionary = dict((chr(i), chr(i)) for i in xrange(dict_size))
-
-        w = result = data.pop(0)
-        for k in data:
-            if k in dictionary:
+        # http://giflib.sourceforge.net/whatsinagif/lzw_image_data.html
+        dictionary = self.build_lzw_table(2 ** lzw_size)
+        reader = CodeReader(data)
+        code_length = lzw_size + 1
+        # dict_size = len(dictionary)
+        # data = self.byte_to_code(data, lzw_size+1)
+        w = result = [data.pop(0)]
+        # for k in data:
+        while True:
+            if len(dictionary) + 1 == 2 ** code_length:
+                code_length += 1
+            k = reader.read(code_length)
+            if k == 2 ** lzw_size:  # cc
+                dictionary = self.build_lzw_table(2 ** lzw_size)
+            elif k == 2 ** lzw_size + 1:  # end
+                LOGGER.debug("end code find")
+                break
+            elif k in dictionary:
                 entry = dictionary[k]
-            elif k == dict_size:
+            elif k == len(dictionary):
                 entry = w + w[0]
             else:
                 raise ValueError('Bad compressed k: %s' % k)
             result += entry
 
             # Add w+entry[0] to the dictionary.
-            dictionary[dict_size] = w + entry[0]
-            dict_size += 1
+            dictionary[len(dictionary)] = w + [entry[0]]
+            # dict_size += 1
 
             w = entry
+        # result = [ord(x) for x in result]
 
-        result = [ord(x) for x in result]
+        print "before decode ", len(data)
+        print "after decode ", len(result)
+
         return result
 
     def get_images(self):
         result = []
         for image in self.images:
             print len(image["data"])
-            data = self.lzwdecode(image["data"], image["LZWMinimumCodeSize"])
+
             color_table = self.globalColorTable
             if image["localColorTableFlag"] == 1:
                 color_table = image["localColorTable"]
-
+            data = self.lzwdecode(image["data"], image["LZWMinimumCodeSize"])
             w = image["width"]
             h = image["height"]
             cur = Image()
