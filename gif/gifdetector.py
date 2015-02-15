@@ -58,8 +58,12 @@ class GIFDetector():
             self.backgroundColorIndex = file_object.read_uint8()
             self.pixelAspectRatio = file_object.read_uint8()
         # self.globalColorTable = [[0, 0, 0]] * (2 ** (self.pixel + 1))
-        self.globalColorTable = [[0, 0, 0] for i in range(2 ** (self.pixel + 1))]
+        if self.globalColorTableFlag:
+            self.globalColorTable = [[0, 0, 0] for i in range(2 ** (self.pixel + 1))]
+        else:
+            self.globalColorTable = []
         LOGGER.info("global table size is %d" % len(self.globalColorTable))
+
         for i in range(len(self.globalColorTable)):
 
             for j in range(3):  # 0 red 1 green 2 blue
@@ -91,7 +95,7 @@ class GIFDetector():
                 mask >>= 1
                 image["localColorTableFlag"] = mask & 0b1
                 if image["localColorTableFlag"]:
-                    image["localColorTable"] = [[0, 0, 0]] * (2 ** (image["pixel"] + 1))
+                    image["localColorTable"] = [[0, 0, 0] for i in xrange((2 ** (image["pixel"] + 1)))]
                     for i in range(len(image["localColorTable"])):
                         for j in range(3):  # 0 red 1 green 2 blue
                             image["localColorTable"][i][j] = file_object.read_uint8()
@@ -203,37 +207,35 @@ class GIFDetector():
         dictionary = self.build_lzw_table(2 ** lzw_size)
         reader = CodeReader(data)
         code_length = lzw_size + 1
-        # dict_size = len(dictionary)
-        # data = self.byte_to_code(data, lzw_size+1)
-        w = result = [data.pop(0)]
-        # for k in data:
+        result = []
+        pre_code = 0
+        clear_code = 2 ** lzw_size
+        end_code = clear_code + 1
         while True:
             if len(dictionary) + 1 == 2 ** code_length:
                 code_length += 1
-            k = reader.read(code_length)
-            if k == 2 ** lzw_size:  # cc
+                print "new code_length ", code_length
+            code = reader.read(code_length)
+            if code == clear_code:  # cc
                 dictionary = self.build_lzw_table(2 ** lzw_size)
-            elif k == 2 ** lzw_size + 1:  # end
+            elif code == end_code:  # end
                 LOGGER.debug("end code find")
                 break
-            elif k in dictionary:
-                entry = dictionary[k]
-            elif k == len(dictionary):
-                entry = w + w[0]
+            elif code in dictionary:
+                result += dictionary[code]
+                if pre_code != clear_code and pre_code != end_code:
+                    k = dictionary[code][0]
+                    dictionary[len(dictionary)] = dictionary[pre_code]+[k]
             else:
-                raise ValueError('Bad compressed k: %s' % k)
-            result += entry
-
-            # Add w+entry[0] to the dictionary.
-            dictionary[len(dictionary)] = w + [entry[0]]
-            # dict_size += 1
-
-            w = entry
-        # result = [ord(x) for x in result]
+                k = dictionary[pre_code][0]
+                tmp = dictionary[pre_code][:]
+                tmp.append(k)
+                result += tmp
+                dictionary[len(dictionary)] = tmp
+            pre_code = code
 
         print "before decode ", len(data)
         print "after decode ", len(result)
-
         return result
 
     def get_images(self):
@@ -242,7 +244,7 @@ class GIFDetector():
             print len(image["data"])
 
             color_table = self.globalColorTable
-            if image["localColorTableFlag"] == 1:
+            if "localColorTableFlag" in image:
                 color_table = image["localColorTable"]
             data = self.lzwdecode(image["data"], image["LZWMinimumCodeSize"])
             w = image["width"]
