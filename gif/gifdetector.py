@@ -203,7 +203,7 @@ class GIFDetector():
 
     def lzwdecode(self, data, lzw_size):
         # http://stackoverflow.com/questions/6834388/basic-lzw-compression-help-in-python
-        # http://giflib.sourceforge.net/whatsinagif/lzw_image_data.html
+        #
         dictionary = self.build_lzw_table(2 ** lzw_size)
         reader = CodeReader(data)
         code_length = lzw_size + 1
