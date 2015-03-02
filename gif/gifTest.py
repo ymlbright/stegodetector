@@ -5,6 +5,7 @@ from gif.gifdetector import GIFDetector
 from common.fileobject import FileObject
 from PIL import Image
 
+
 class MyTestCase(unittest.TestCase):
 
     def test_gif1(self):
@@ -24,22 +25,33 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(detector.pixelAspectRatio, 0)
 
         self.assertEqual(detector.globalColorTable.__len__(), 2**(detector.pixel+1))
+        # images = detector.get_images()
+        # cnt = 0
+        # for image in images:
+        #     self.assertEqual(image.w * image.h, len(image.data))
+        #     im = Image.new("RGB", (image.w, image.h))
+        #
+        #     im.putdata([(x[0], x[1], x[2]) for x in image.data])
+        #     im.save("%d.jpg" % cnt)
+        #     cnt += 1
 
-        images = detector.get_images()
-        for image in images:
-            im = Image.new("RGB", (len(image[0]), len(image)))
-            for i in range(len(image)):
-                for j in range(len(image[i])):
-                    im.putpixel((i, j), image[i][j])
-            im.save(str(i)+".jpg")
-
-
-    def test_lzw(self):
-        data = [chr(i) for i in [1,1,2,4,3,4,9,5,11,2] ]
+    def test_get_data(self):
         detector = GIFDetector(FileObject("1.gif"))
-        res = detector.lzwdecode(data, 2, [0, [1], [2], [3]])
-        print res
+        images = detector.get_images()
+        cnt = 0
+        for image in images:
+            self.assertEqual(image.w * image.h, len(image.data))
+            im = Image.new("RGB", (image.w, image.h))
 
+            im.putdata([(x[0], x[1], x[2]) for x in image.data])
+            im.save("%d.jpg" % cnt)
+            cnt += 1
+
+    # def test_lzw(self):
+    #     detector = GIFDetector(FileObject("1.gif"))
+    #     data = ['T', 'O', 'B', 'E', 'O', 'R', 'N', 'O', 'T', 256, 258, 260, 265, 259, 261, 263]
+    #     decoded = detector.lzwdecode(data, 8)
+    #     self.assertEqual(decoded, [ord(c) for c in "TOBEORNOTTOBEORTOBEORNOT"])
 
 if __name__ == '__main__':
     unittest.main()
