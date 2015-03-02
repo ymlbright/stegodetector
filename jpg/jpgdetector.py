@@ -138,7 +138,7 @@ class JPGDetector():
 
     def tag_app(self, tag):
         # 0xFFE1~0xFFEE Application-specific
-        appID = int(tag)-0xFFE0
+        appID = (ord(tag[0])<<8) + ord(tag[1]) - 0xFFE0
         length = self.read_uint16() - 2
         data = self.fileObject.read(length)
         if not appID in [1, 2, 13 ,14]:
@@ -205,7 +205,10 @@ class JPGDetector():
         length = self.read_uint16() - 2
         while length>0:
             tableIDByte = self.fileObject.read_uint8()
-            tableID = (tableIDByte>>4)+(tableIDByte&0xf)
+            if tableIDByte >> 4 == 0:
+                tableID = tableIDByte&0xf
+            else:
+                tableID = 2 + tableIDByte&0xf
             if tableID<4:
                 length -= self.huffmantree_decode(tableID)+1
             else:
@@ -227,15 +230,18 @@ class JPGDetector():
         huffmanTree = {}
         powerPos = 0
         lastBit = 0
+        bitLength = 0
         for i in range(16):
             if bitCount[i] == 0:
                 if lastBit < 2**i:
                     lastBit = lastBit << 1
+                    bitLength += 1
                 continue
             while bitCount[i]>0:
-                if i>1 and lastBit < 2**i:
+                while bitLength <= i:
                     lastBit = lastBit << 1
-                huffmanTree[lastBit] = bitPower[powerPos]
+                    bitLength += 1
+                huffmanTree[lastBit] = [bitLength, ord(bitPower[powerPos])]
                 lastBit += 1
                 powerPos += 1
                 bitCount[i] -= 1
@@ -263,12 +269,13 @@ class JPGDetector():
             LOGGER.error('[0x%x] Color type must be YCrCb(0x03) in JFIF.'%self.fileObject.cur())
         comp = self.fileObject.read(3)
         for i in range(3):
-            self.scanQuantization[i] = {'AC' :ord(comp[i])>>4, 'DC' :ord(comp[i])&0xf}
+            self.scanQuantization[i] = {'DC' :ord(comp[i])>>4, 'AC' :ord(comp[i])&0xf}
         self.scanSs = self.fileObject.read(1)
         self.scanSe = self.fileObject.read(1)
         self.scanAh = ord(self.fileObject.read(1))
         self.scanAl = self.scanAh & 0xf
         self.scanAh = self.scanAh >> 4
+        self.fileObject.read(3)
 
     def tag_eoi(self, tag):
         # 0xFFD9 End Of Image
@@ -398,12 +405,12 @@ class JPGDetector():
     # decode scan data of sof0
     def decode_scandata(self):
         # init decode varible
-        huffmanTableY_DC = self.huffmanTable[self.scanQuantization[0]['DC']]
-        huffmanTableY_AC = self.huffmanTable[2+self.scanQuantization[0]['AC']]
-        huffmanTableCr_DC = self.huffmanTable[self.scanQuantization[1]['DC']]
-        huffmanTableCr_AC = self.huffmanTable[2+self.scanQuantization[1]['AC']]
-        huffmanTableCb_DC = self.huffmanTable[self.scanQuantization[2]['DC']]
-        huffmanTableCb_AC = self.huffmanTable[2+self.scanQuantization[2]['AC']]
+        huffmanTableY_DC = self.huffmanTable[0]
+        huffmanTableY_AC = self.huffmanTable[2]
+        huffmanTableCr_DC = self.huffmanTable[1]
+        huffmanTableCr_AC = self.huffmanTable[3]
+        huffmanTableCb_DC = self.huffmanTable[1]
+        huffmanTableCb_AC = self.huffmanTable[3]
         quantizationTableY = self.quantizationTable[self.colorQuantization[1]['TableID']]
         quantizationTableCr = self.quantizationTable[self.colorQuantization[2]['TableID']]
         quantizationTableCb = self.quantizationTable[self.colorQuantization[3]['TableID']]
@@ -413,49 +420,94 @@ class JPGDetector():
         vertY = self.colorQuantization[1]['Vert'] 
         vertCr = self.colorQuantization[2]['Vert']
         vertCb = self.colorQuantization[3]['Vert']
-        hmax = max([horzY, horzCr, horzCb])
-        vmax = max([vertY, vertCr, vertCb])
-        self.baseY = 0
-        self.baseCr = 0
-        self.BaseCb = 0
+        hmax = max([horzY, horzCr, horzCb])*8
+        vmax = max([vertY, vertCr, vertCb])*8
+        self.diffY = 0
+        self.diffCr = 0
+        self.diffCb = 0
         mcuData = []
-
-
-        self.streamBuffer = []
         LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, 'Start to decode scan data.')
-        while self.scanFlag == True:
-            # read Y data
-            d = 0
-            for i in range(1,17):
-                if self.read_bitstream(i) in huffmanTableY_DC.keys():
-                    d = self.read_bitstream(i, False)
-                    break
-            # read DC part
-            dataLength = ord(huffmanTableY_DC[d])&0xf
-            d = self.read_bitstream(dataLength, False) # need to decode
-            if self.baseY == 0:
-                self.baseY = d
-            else:
-                self.baseY += d
-            dataY = [self.baseY for i in range(64)]
-            # read AC part
-            dataYIndex = 0
-            for i in range(63):
-                dataYIndex += 1
-                for i in range(1,17):
-                    if self.read_bitstream(i) in huffmanTableY_AC.keys():
-                        d = self.read_bitstream(i, False)
-                        break
-                dataLength = ord(huffmanTableY_DC[d])&0xf
-                if dataLength == 0:
-                    break
-                else:
-                    d = self.read_bitstream(dataLength, False) # need to decode
-                    skipLength = 0
-                    dataYIndex += skipLength
-                    dataY[dataYIndex] = self.baseY + d
-            mcuData.append([dataY, 0 , 0])
+#######################################################################################################
+        
 
+        # #######################  First Y  #########################
+        for i in range(1,17):
+            d = self.read_bitstream(i)
+            if d in huffmanTableY_DC.keys() and i == huffmanTableY_DC[d][0]:
+                self.read_bitstream(i, True)
+                break
+        # read DC part
+        baseY = self.dc_value_decode(self.read_bitstream(huffmanTableY_DC[d][1], True), huffmanTableY_DC[d][1])
+        dataY = [baseY for i in range(64)]
+        # read AC part
+        dataYIndex = 0
+        for i in range(63):
+            for i in range(1,17):
+                d = self.read_bitstream(i)
+                if d in huffmanTableY_AC.keys() and i == huffmanTableY_AC[d][0]:
+                    self.read_bitstream(i, True)
+                    break
+            dataLength = huffmanTableY_AC[d][1] & 0xf
+            if dataLength == 0:
+                break
+            else:
+                ac = self.read_bitstream(dataLength, True)
+                dataYIndex += huffmanTableY_AC[d][1] >> 4
+                dataY[dataYIndex] += ac
+            dataYIndex += 1
+        # #######################  First Cr  #########################
+        for i in range(1,17):
+            d = self.read_bitstream(i)
+            if d in huffmanTableCr_DC.keys() and i == huffmanTableCr_DC[d][0]:
+                self.read_bitstream(i, True)
+                break
+        # read DC part
+        baseCr = self.dc_value_decode(self.read_bitstream(huffmanTableCr_DC[d][1], True), huffmanTableCr_DC[d][1])
+        dataCr = [baseCr for i in range(64)]
+        # read AC part
+        dataCrIndex = 0
+        for i in range(63):
+            for i in range(1,17):
+                d = self.read_bitstream(i)
+                if d in huffmanTableCr_AC.keys() and i == huffmanTableCr_AC[d][0]:
+                    self.read_bitstream(i, True)
+                    break
+            dataLength = huffmanTableCr_AC[d][1] & 0xf
+            if dataLength == 0:
+                break
+            else:
+                ac = self.read_bitstream(dataLength, True)
+                dataCrIndex += huffmanTableCr_AC[d][1] >> 4
+                dataCr[dataCrIndex] += ac
+            dataCrIndex += 1
+        # #######################  First Cb  #########################
+        for i in range(1,17):
+            d = self.read_bitstream(i)
+            if d in huffmanTableCb_DC.keys() and i == huffmanTableCb_DC[d][0]:
+                self.read_bitstream(i, True)
+                break
+        # read DC part
+        baseCb = self.dc_value_decode(self.read_bitstream(huffmanTableCb_DC[d][1], True), huffmanTableCb_DC[d][1])
+        dataCb = [baseCb for i in range(64)]
+        # read AC part
+        dataCbIndex = 0
+        for i in range(63):
+            for i in range(1,17):
+                d = self.read_bitstream(i)
+                if d in huffmanTableCb_AC.keys() and i == huffmanTableCb_AC[d][0]:
+                    self.read_bitstream(i, True)
+                    break
+            dataLength = huffmanTableCb_AC[d][1] & 0xf
+            if dataLength == 0:
+                break
+            else:
+                ac = self.read_bitstream(dataLength, True)
+                dataCbIndex += huffmanTableCb_AC[d][1] >> 4
+                dataCb[dataCbIndex] += ac
+            dataCbIndex += 1
+        mcuData.append([dataY, dataCr, dataCb])
+
+        print mcuData
         return ''
 
     def read_bitstream(self, bitLength, changeFlag = False): 
@@ -476,10 +528,9 @@ class JPGDetector():
                     self.streamBuffer.append(ord(d))
                     expendLength += 8
                 elif '\xd0' <= n <= '\xf7':
-                    if changeFlag == True:
-                        self.baseY = 0
-                        self.baseCr = 0
-                        self.BaseCb = 0
+                    self.diffY = 0
+                    self.diffCr = 0
+                    self.diffCb = 0
                 else:
                     self.unexpected_tag(tag, '?-In Scandata-?')
             else:
@@ -500,15 +551,24 @@ class JPGDetector():
             bitLength -= 8
         if bitLength > 0 :
             ret = ret << bitLength
-            ret += self.streamBuffer[streamIndex] & myBitStreamMaskL[bitLength]
+            ret += (self.streamBuffer[streamIndex] & myBitStreamMaskL[bitLength]) >> (8 - bitLength)
         if changeFlag == True:
             self.bitStreamStart = bitNewStart
         return ret
 
+    def dc_value_decode(self, value, bitLength):
+        if bitLength == 0:
+            return 0
+        bitLength -= 1
+        if value>>bitLength == 1:
+            return (2 ** bitLength) + value - (1<<bitLength)
+        else:
+            return -(2 ** (bitLength+1)) + value + 1
+
     def clean_bitstream_remainder(self):
         remainder = self.streamBuffer[0] & myBitStreamMaskR[8-self.bitStreamStart]
         if remainder != 0 and remainder != myBitStreamMaskR[8-self.bitStreamStart]:
-            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, 'Scandata remainder is not equal, is %s'%bin(remainder))
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '?0x%x? Unsual end of bitstream, is %s. (0x%s)'%(self.scanDataIndex, bin(remainder), self.streamBuffer[0]))
         self.streamBuffer.remove(self.streamBuffer[0])
         self.bitStreamStart = 0
 
