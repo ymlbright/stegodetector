@@ -9,7 +9,7 @@ from common.fastscan import fastscan
 from common.logger import *
 from bmp.bmpdetector import BMPDetector
 from jpg.jpgdetector import JPGDetector
-
+import Image
 class StegoDetector():
     # the file to detected
     filePath = ''
@@ -68,8 +68,22 @@ class StegoDetector():
         if not self.fastMod:
             imgDetector = self.mimeMap[self.fileType](self.fileOject)
             [rowData, bitsPerPixel, channel] = imgDetector.detect()
-
+            x = Image.new('RGB',(imgDetector.width,imgDetector.height),(0,0,0))
+            index = 0
+            print bitsPerPixel, channel
+            for j in range(imgDetector.height):
+                for i in range(imgDetector.width):
+                    r = ord(rowData[index])
+                    g = ord(rowData[index+1])
+                    b = ord(rowData[index+2])
+                    x.putpixel((i,j),(r,g,b))
+                    if channel == 4:
+                        a = ord(rowData[index+3])
+                        index += 4
+                    else:
+                        index += 3
+            x.save('save.bmp','BMP')
             # do some check on rowdata
 
-t = StegoDetector(filePath='test2.jpg', fileType='jpg')
+t = StegoDetector(filePath='test.bmp', fileType='bmp')
 t.start()
