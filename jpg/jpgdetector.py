@@ -417,6 +417,9 @@ class JPGDetector():
         self.BaseCb = 0
         mcuData = []
 
+        with open('scandata.bin','wb') as f:
+            f.write(self.fileObject.read(self.fileObject.size - self.fileObject.cur()))
+
         # try to use C++ to decode ....
 
         # self.streamBuffer = []
