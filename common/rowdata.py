@@ -4,9 +4,8 @@
 # @Author  : yml_bright@163.com
 
 class RowData():
-    def __init__(self, rowData, bitPerPixel, channel, width, height):
+    def __init__(self, rowData, channel, width, height):
         self.rowData = rowData
-        self.bitPerPixel = bitPerPixel
         self.channel = channel
         self.width = width
         self.height = height

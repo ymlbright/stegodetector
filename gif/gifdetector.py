@@ -139,7 +139,7 @@ class GIFDetector():
                     #           what was there prior to rendering the graphic.
                     #  4-7 -    To be defined.
                     control["delayTime"] = file_object.read_uint16()
-                    control["TransparentColorIndex"] = file_object.read_uint8()
+                    control["TransparentColonrIndex"] = file_object.read_uint8()
                     terminator = file_object.read_uint8()
                     if terminator != 0:
                         LOGGER.log(CustomLoggingLevel.OTHER_DATA,
@@ -209,8 +209,6 @@ class GIFDetector():
                     data = file_object.read(data_size)
                     image["data"] += data
                 self.images.append(image)
-                if len(image["data"]) != image["width"] * image["height"]:
-                    LOGGER.log(CustomLoggingLevel.OTHER_DATA, "image %d has wrong width or height " % len(self.images))
                 image = {}
 
     @staticmethod
@@ -259,7 +257,7 @@ class GIFDetector():
     def get_images(self):
         result = []
         for image in self.images:
-            print len(image["data"])
+            # print len(image["data"])
 
             color_table = self.globalColorTable
             if "localColorTableFlag" in image and image["localColorTableFlag"] == 1:
@@ -272,6 +270,8 @@ class GIFDetector():
             cur.h = h
             cur.data = [color_table[i] for i in data]
             result.append(cur)
+            if len(cur.data) != cur.w * cur.h:
+                LOGGER.log(CustomLoggingLevel.OTHER_DATA, "image %d has wrong width or height " % len(self.result))
         return result
 
     def detect(self):
