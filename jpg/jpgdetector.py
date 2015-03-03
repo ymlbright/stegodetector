@@ -36,7 +36,7 @@ class JPGDetector():
             '\xff\xc9' :self.tag_sof,
             '\xff\xca' :self.tag_sof,
             '\xff\xcb' :self.tag_sof,
-            '\xff\xcc' :self.tag_dac,
+            '\xff\xcc':self.tag_dac,
             '\xff\xcd' :self.tag_sof,
             '\xff\xce' :self.tag_sof,
             '\xff\xcf' :self.tag_sof,
