@@ -423,7 +423,7 @@ class JPGDetector():
         self.baseY = 0
         self.baseCr = 0
         self.baseCb = 0
-        mcuData = []
+        rowData = []
 
         if vertCb != 1 or vertCr != 1 or horzCb != 1 or horzCr !=1:
             LOGGER.error('Error in decode scan data, ONLY support vertCb==vertCr==horzCb==horzCr==1!')
@@ -438,21 +438,23 @@ class JPGDetector():
         if self.height % (vertY*8) != 0 :
             vBlock += 1
         # read mcuBlock
-        for block in range(hBlock*vBlock):
-            [dataY, dataCr, dataCb] = self.read_mcu_block(scanY,scanCr,scanCb)
-            mcuBlock = [ [ [0, 0, 0] for j in range(horzY*8) ] for i in range(vertY*8) ]
-            for i in range(vertY):
-                for j in range(horzY):
-                    for k in range(8):
-                        for l in range(8):
-                            y = dataY[i*horzY+j][k*8+l]
-                            cr = dataCr[0][k*8+l]
-                            cb = dataCb[0][k*8+l]
-                            r = int(y + 1.402*cr + 128) % 256
-                            b = int(y + 1.772*cb + 128) % 256
-                            g = int(y - 0.344*cr - 0.714*cb + 128) % 256
-                            mcuBlock[i*8+k][j*8+l] = [r, g, b]
-            mcuData.append(mcuBlock)
+
+        for vb in range(vertY):
+            for hb in range(horzY):
+                [dataY, dataCr, dataCb] = self.read_mcu_block(scanY,scanCr,scanCb)
+                mcuBlock = [ [ [0, 0, 0] for j in range(horzY*8) ] for i in range(vertY*8) ]
+                for i in range(vertY):
+                    for j in range(horzY):
+                        for k in range(8):
+                            for l in range(8):
+                                y = dataY[i*horzY+j][k*8+l]
+                                cr = dataCr[0][k*8+l]
+                                cb = dataCb[0][k*8+l]
+                                r = int(y + 1.402*cr + 128) % 256
+                                b = int(y + 1.772*cb + 128) % 256
+                                g = int(y - 0.344*cr - 0.714*cb + 128) % 256
+                                mcuBlock[i*8+k][j*8+l] = [r, g, b]
+                mcuData.append(mcuBlock)
         print mcuData
 
         self.clean_bitstream_remainder()
