@@ -10,12 +10,15 @@ import cStringIO
 try:
     from common.fileobject import FileObject
     from common.logger import *
+    from common.imageshow import ImageShow
+    from common.rowdata import RowData
 except:
     import sys
     sys.path.append("..")
     from common.fileobject import FileObject
     from common.logger import *
-    from imageShow.imageShow import imageShow
+    from common.imageshow import ImageShow
+    from common.rowdata import RowData
 
 
 
@@ -199,47 +202,68 @@ class PngDetector():
         return t
 
 
-    def detect(self):
-        self.isPng(self.fileObject)
+    def result(self,data):
+        rData  = []
+        for y in range(self.height):
+            for x in range(self.width):
+                pix = []
+                for i in range(self.bpp):
+                    pix.append(data[y][x*self.bpp+i])
+                rData.append(pix)
+        return [RowData(rData, self.bpp, self.width, self.height)]
+
+    def parseChunk(self):
         chunk = self.getChunkInfo(self.fileObject)
         self.data = ''
+        chunk_count = {'IHDR':0, "IDAT":0, "IEND":0}
         while chunk:
             # LOGGER.info(chunk)
             if chunk['name']=='\x49\x48\x44\x52':#'IHDR'
-                LOGGER.info('png header chunk detected')
+             
+                chunk_count['IHDR'] += 1
                 self.get_ihdr_info(chunk['data'])
-                #print self.headerInfo
-                LOGGER.info('image header info:\n' + str(self.headerInfo))
+            
             if chunk['name']=='\x49\x44\x41\x54':#'IDAT'
-                LOGGER.info('png IDAT chunk detected')
+                #LOGGER.info('png IDAT chunk detected')
+                chunk_count['IDAT'] += 1
                 self.data +=  chunk['data']
 
             if chunk['name']=='\x49\x45\x4e\x44':#'IEND'
-                LOGGER.info('png IEND chunk detected')
+                #LOGGER.info('png IEND chunk detected')
+                chunk_count['IEND'] += 1
+
+            if chunk['name'] == '':
+                pass
             chunk = self.getChunkInfo(self.fileObject)
 
+        #print the chunk info
+        for idx,name in enumerate(chunk_count):
+
+            LOGGER.info('detect png %s chunk %d times' %(name,chunk_count[name]))
+            if name=='IHDR':
+                LOGGER.info('PNG Image Header Info:\n' + str(self.headerInfo))
+    def getPicPixels(self):
         decData = self.decompress( cStringIO.StringIO(self.data))
         self.calcBytesPerPixel()
-        print len(decData)
-        data_mtx = self.ifilter(decData)
-        self.dataList = []
-        for i in range(self.headerInfo['height']):
-            dataList += data_mtx[i]
+        return self.ifilter(decData)
+
+    def detect(self):
+        self.isPng(self.fileObject)
+        self.parseChunk()
+        data_mtx = self.getPicPixels()
         
-        
-        # print len(data_mtx[0])*len(data_mtx)
-        # pix_mtx = self.bytes2pixels(data_mtx, self.headerInfo['bit depth'], self.headerInfo['width'])
-        # img = imageShow("RGBA",self.headerInfo['width'],self.headerInfo['height'],self.bpp,pix_mtx)
-        # img.show()
-        # img.save('test.png')
+        return  self.result(data_mtx)
+
        
 
          
 
 
 if __name__ == '__main__':
-    png = PngDetector(FileObject('../pic/png3.png'))
-    png.detect()
+    png = PngDetector(FileObject('../pic/png4.png'))
+    show = ImageShow(png.detect())
+    show.show()
+    # show.show()
     # img = Image.open("test.png")
     # print img
     # width,height = img.size

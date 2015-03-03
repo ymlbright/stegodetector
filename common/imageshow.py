@@ -10,53 +10,39 @@ except:
 
 
 class ImageShow():
-    def __init__(self,,director=0):
-        self.width = width
-        self.height = height 
-        self.bpp = bpp
+    def __init__(pic,picArray):
         LOGGER.addHandler(stream_handler)
-        self.data = data
-        self.director = director
+        pic.picArray = picArray       
        
 
-    def show(self):
-        if len(self.data)==0:
+    def show(pic):
+        if len(pic.picArray)==0:
             LOGGER.error("no picture data")
             return
-        for pic in self.data:
+        LOGGER.info("show picture...")
+        for pic in pic.picArray:
+            img = Image.new("RGBA", (pic.width,pic.height))
+            pix = img.load()
+            if pic.channel == 4 : #RGBA
+                for y in range(0,pic.height):
+                    for x in range(0,pic.width):
+                        pos = x * pic.channel
+                        pix[x,y] = (pic.rowData[y*pic.width+x][0],pic.rowData[y*pic.width+x][1],pic.rowData[y*pic.width+x][2],pic.rowData[y*pic.width+x][3])
+            elif pic.channel ==3 : #RGB
+                for y in range(0,pic.height):
+                    for x in range(0,pic.width):
+                        pos = x * pic.channel
+                        pix[x,y] = (pic.rowData[y*pic.width+x][0],pic.rowData[y*pic.width+x][1],pic.rowData[y*pic.width+x][2])
+            elif pic.channel == 1: #L
+                for y in range(0,pic.height):
+                    for x in range(0,pic.width):
+                        pos = x * pic.channel
+                        value = pic.rowData[y*pic.width+x][0]
+                        pix[x,y] = (value,value,value)
+            img.show()
 
-
-
-
-
-        if self.mode=="RGBA":
-            self.image = Image.new("RGBA", (width,height))
-            pix = self.image.load()
-            for y in range(0,self.height):
-                for x in range(0,self.width):
-                    pos = x * self.bpp
-                    pix[x,y] = (self.data[y*self.width+pos],self.data[y*self.width+pos+1],self.data[y*self.width+pos+2],self.data[y*self.width+pos+3])
-            
-        elif self.mode=="RGB":
-            self.image = Image.new("RGB", (width,height))
-            pix = self.image.load()
-            for y in range(0,self.height):
-                for x in range(0,self.width):
-                    pos = x * self.bpp
-                    pix[x,y] = (self.data[y*self.width+pos],self.data[y*self.width+pos+1],self.data[y*self.width+pos+2])
-            
-        elif self.mode=="L":
-            self.image = Image.new("L", (width,height))
-            pix = self.image.load()
-            for y in range(0,self.height):
-                for x in range(0,self.width):
-                    pix[x,y] = (self.data[y*self.width+x],self.data[y*self.width+x],self.data[y*self.width+x])
-        elif self.mode=="P":
-            pass
-        self.image.show()
-
-    def save(self,name):
-        self.image.save(name)
+    def save(pic,name):
+        pic.image.save(name)
 
 
 
