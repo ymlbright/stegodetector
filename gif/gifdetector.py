@@ -90,7 +90,7 @@ class GIFDetector():
                 image["height"] = file_object.read_uint16()
 
                 if image["xOffset"] + image["width"] > self.logicScreenWidth or \
-                                        image["yOffset"] + image["height"] > self.logicScreenHeight:
+                   image["yOffset"] + image["height"] > self.logicScreenHeight:
                     LOGGER.log(CustomLoggingLevel.OTHER_DATA,
                                "some part out of logic screen at image %d" % len(self.images) + 1)
 
