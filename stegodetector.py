@@ -10,6 +10,7 @@ from common.logger import *
 from bmp.bmpdetector import BMPDetector
 from jpg.jpgdetector import JPGDetector
 import Image
+
 class StegoDetector():
     # the file to detected
     filePath = ''
@@ -70,20 +71,16 @@ class StegoDetector():
             #[[rowData, bitsPerPixel, channel, width, height] , ... ] 
             a = imgDetector.detect()[0]
             #return
-            x = Image.new('RGB',(a.width,a.height),(0,0,0))
+            x = Image.new('RGB',(a.width, a.height),(0,0,0))
             index = 0
 
             for j in range(a.height):
                 for i in range(a.width):
-                    r = ord(a.rowData[index])
-                    g = ord(a.rowData[index+1])
-                    b = ord(a.rowData[index+2])
+                    r = a.rowData[index][0]
+                    g = a.rowData[index][1]
+                    b = a.rowData[index][2]
                     x.putpixel((i,j),(r,g,b))
-                    if a.channel == 4:
-                        t = ord(a.rowData[index+3])
-                        index += 4
-                    else:
-                        index += 3
+                    index += 1
             x.save('save.bmp','BMP')
             # do some check on rowdata
 
