@@ -6,6 +6,9 @@
 
 
 from common.logger import LOGGER, CustomLoggingLevel
+from common.rowdata import RowData
+from common.fileobject import FileObject
+
 import logging
 
 
@@ -30,6 +33,7 @@ class CodeReader():
                 self.mask = 1
                 self.pos += 1
         return ans
+
 
 class GIFDetector():
     def __init__(self, file_object):
@@ -73,10 +77,11 @@ class GIFDetector():
         while True:
             tag = file_object.read_uint8()
 
-            if tag == 59:
+            if tag == 0x3b:
+
                 break  # end of gif
 
-            if tag == 0b00101100:  # start of a image descriptor
+            if tag == 0x2c:  # start of a image descriptor
                 # LOGGER.info("image descriptor")
                 image["xOffset"] = file_object.read_uint16()
                 image["yOffset"] = file_object.read_uint16()
@@ -85,7 +90,7 @@ class GIFDetector():
                 image["height"] = file_object.read_uint16()
 
                 if image["xOffset"] + image["width"] > self.logicScreenWidth or \
-                                        image["yOffset"] + image["height"] > self.logicScreenHeight:
+                   image["yOffset"] + image["height"] > self.logicScreenHeight:
                     LOGGER.log(CustomLoggingLevel.OTHER_DATA,
                                "some part out of logic screen at image %d" % len(self.images) + 1)
 
@@ -269,10 +274,14 @@ class GIFDetector():
             result.append(cur)
         return result
 
-    def detcet(self):
-        return None
+    def detect(self):
+        for d in self.fileObject.redundancy():
+            self.showextradata(d['data'], d['start'])
+        return [RowData(image.data, 3, image.w, image.h) for image in self.get_images()]
 
-
-
-
-
+    def showextradata(self, data, location):
+        if len(data) > 128:
+            tmpFileObject = FileObject(data)
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s' % (location, tmpFileObject.type()) )
+        else:
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] > %s' % (location, data) )

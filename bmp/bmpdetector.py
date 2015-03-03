@@ -168,13 +168,14 @@ class BMPDetector():
             lineLength = (lineLength / 4 + 1)*4
         index = 0
         for j in range(self.height):
+            lineData = []
             if self.bitsPerPixel >= 24:
                 for i in range(self.width):
                     if self.bitsPerPixel == 32:
-                        rowData.append(data[index+2] + data[index+1] + data[index] + data[index+3])
+                        lineData.append([ord(data[index+2]), ord(data[index+1]), ord(data[index]), ord(data[index+3])])
                         index += 4
                     else: # 24
-                        rowData.append(data[index+2] + data[index+1] + data[index])
+                        lineData.append([ord(data[index+2]), ord(data[index+1]), ord(data[index])])
                         index += 3
             else:
                 # decode rowdata from color palette
@@ -185,17 +186,19 @@ class BMPDetector():
                     index += 1
                     for k in range(kmax-1, -1, -1):
                         if i < self.width:
-                            rowData.append(self.colorPalette[ (d>>(k*self.bitsPerPixel)) & mask[self.bitsPerPixel] ])
+                            colorPalette = self.colorPalette[ (d>>(k*self.bitsPerPixel)) & mask[self.bitsPerPixel] ]
+                            lineData.append([ord(colorPalette[0]), ord(colorPalette[1]), ord(colorPalette[2]), ord(colorPalette[3])])
                             i += 1
                         else:
                             i = -1
+            rowData = lineData + rowData
             appendData = data[index:(j+1)*lineLength]
             for c in appendData:
                 if c != '\x00' and c != '\xff':
                     LOGGER.log(CustomLoggingLevel.OTHER_DATA, '[0x%x]Unsual append data: 0x%s'%(self.headerLength+index, appendData.encode('hex')))
                     break
             index = (j+1)*lineLength
-        return ''.join(rowData)
+        return rowData
 
     def showextradata(self, data, location):
         if len(data) > 128:
@@ -215,7 +218,7 @@ class BMPDetector():
             rowData = self.rowdata_ver4()
         for d in self.fileObject.redundancy():
             self.showextradata(d['data'], d['start'])
-        return [RowData(rowData, self.bitsPerPixel, self.channel, self.width, self.height)]
+        return [RowData(rowData, self.channel, self.width, self.height)]
 
         # LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG,"BMP型图像调试信息")
         # LOGGER.log(CustomLoggingLevel.ASCII_DATA,"连续 ASCII 或 可见字符")
