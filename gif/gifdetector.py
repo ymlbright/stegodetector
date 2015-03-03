@@ -6,6 +6,9 @@
 
 
 from common.logger import LOGGER, CustomLoggingLevel
+from common.rowdata import RowData
+from common.fileobject import FileObject
+
 import logging
 
 
@@ -30,6 +33,7 @@ class CodeReader():
                 self.mask = 1
                 self.pos += 1
         return ans
+
 
 class GIFDetector():
     def __init__(self, file_object):
@@ -74,6 +78,7 @@ class GIFDetector():
             tag = file_object.read_uint8()
 
             if tag == 59:
+
                 break  # end of gif
 
             if tag == 0b00101100:  # start of a image descriptor
@@ -269,10 +274,14 @@ class GIFDetector():
             result.append(cur)
         return result
 
-    def detcet(self):
-        return None
+    def detect(self):
+        for d in self.fileObject.redundancy():
+            self.showextradata(d['data'], d['start'])
+        return [RowData(image.data, 3, image.w, image.h) for image in self.get_images()]
 
-
-
-
-
+    def showextradata(self, data, location):
+        if len(data) > 128:
+            tmpFileObject = FileObject(data)
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s' % (location, tmpFileObject.type()) )
+        else:
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] > %s' % (location, data) )
