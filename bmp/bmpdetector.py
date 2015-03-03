@@ -6,7 +6,7 @@
 import struct
 from common.fileobject import FileObject
 from common.logger import LOGGER, CustomLoggingLevel
-
+from common.rowdata import RowData
 class BMPDetector():
 
     detectSensitive = 1.0
@@ -206,7 +206,7 @@ class BMPDetector():
     
     def detect(self):
         self.start()
-        rowData = None
+        rowData = ''
         if self.version == 1:
             rowData = self.rowdata_ver1()
         elif self.version in [2, 3]:
@@ -215,7 +215,7 @@ class BMPDetector():
             rowData = self.rowdata_ver4()
         for d in self.fileObject.redundancy():
             self.showextradata(d['data'], d['start'])
-        return rowData, self.bitsPerPixel, self.channel
+        return [RowData(rowData, self.bitsPerPixel, self.channel, self.width, self.height)]
 
         # LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG,"BMP型图像调试信息")
         # LOGGER.log(CustomLoggingLevel.ASCII_DATA,"连续 ASCII 或 可见字符")
