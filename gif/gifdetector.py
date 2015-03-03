@@ -77,11 +77,11 @@ class GIFDetector():
         while True:
             tag = file_object.read_uint8()
 
-            if tag == 59:
+            if tag == 0x3b:
 
                 break  # end of gif
 
-            if tag == 0b00101100:  # start of a image descriptor
+            if tag == 0x2c:  # start of a image descriptor
                 # LOGGER.info("image descriptor")
                 image["xOffset"] = file_object.read_uint16()
                 image["yOffset"] = file_object.read_uint16()
