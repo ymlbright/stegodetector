@@ -67,18 +67,20 @@ class StegoDetector():
 
         if not self.fastMod:
             imgDetector = self.mimeMap[self.fileType](self.fileOject)
-            [rowData, bitsPerPixel, channel] = imgDetector.detect()
-            x = Image.new('RGB',(imgDetector.width,imgDetector.height),(0,0,0))
+            #[[rowData, bitsPerPixel, channel, width, height] , ... ] 
+            a = imgDetector.detect()[0]
+            #return
+            x = Image.new('RGB',(a.width,a.height),(0,0,0))
             index = 0
-            print bitsPerPixel, channel
-            for j in range(imgDetector.height):
-                for i in range(imgDetector.width):
-                    r = ord(rowData[index])
-                    g = ord(rowData[index+1])
-                    b = ord(rowData[index+2])
+
+            for j in range(a.height):
+                for i in range(a.width):
+                    r = ord(a.rowData[index])
+                    g = ord(a.rowData[index+1])
+                    b = ord(a.rowData[index+2])
                     x.putpixel((i,j),(r,g,b))
-                    if channel == 4:
-                        a = ord(rowData[index+3])
+                    if a.channel == 4:
+                        t = ord(a.rowData[index+3])
                         index += 4
                     else:
                         index += 3
