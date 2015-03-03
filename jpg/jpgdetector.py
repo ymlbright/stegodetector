@@ -6,7 +6,9 @@
 import struct
 from common.fileobject import FileObject
 from common.logger import LOGGER, CustomLoggingLevel
+from common.rowdata import RowData
 from jpgenum import *
+
 class JPGDetector():
 
     def __init__(self, fileObject):
@@ -423,13 +425,13 @@ class JPGDetector():
         self.baseY = 0
         self.baseCr = 0
         self.baseCb = 0
-        rowData = []
+        rowData = [ [0, 0, 0] for i in range(self.width*self.height)]
 
         if vertCb != 1 or vertCr != 1 or horzCb != 1 or horzCr !=1:
             LOGGER.error('Error in decode scan data, ONLY support vertCb==vertCr==horzCb==horzCr==1!')
         else:
             LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, 'Start to decode scan data.')
-        return ''
+
         # calc block number
         hBlock = self.width / horzY / 8
         if self.width % (horzY*8) != 0 :
@@ -439,26 +441,36 @@ class JPGDetector():
             vBlock += 1
         # read mcuBlock
 
-        for vb in range(vertY):
-            for hb in range(horzY):
+        widthIndex = 0
+        heightIndex = 0
+        for vb in range(vBlock):
+            for hb in range(hBlock):
                 [dataY, dataCr, dataCb] = self.read_mcu_block(scanY,scanCr,scanCb)
-                mcuBlock = [ [ [0, 0, 0] for j in range(horzY*8) ] for i in range(vertY*8) ]
                 for i in range(vertY):
+                    heightIndex = (vb*vertY + i)*8
                     for j in range(horzY):
+                        widthIndex = (hb*horzY + j)*8
                         for k in range(8):
-                            for l in range(8):
-                                y = dataY[i*horzY+j][k*8+l]
-                                cr = dataCr[0][k*8+l]
-                                cb = dataCb[0][k*8+l]
-                                r = int(y + 1.402*cr + 128) % 256
-                                b = int(y + 1.772*cb + 128) % 256
-                                g = int(y - 0.344*cr - 0.714*cb + 128) % 256
-                                mcuBlock[i*8+k][j*8+l] = [r, g, b]
-                mcuData.append(mcuBlock)
-        print mcuData
-
+                            if heightIndex + k < self.height:
+                                for l in range(8):
+                                    if widthIndex + l < self.width:
+                                        y = dataY[i*horzY+j][k*8+l]
+                                        cr = dataCr[0][k*8+l]
+                                        cb = dataCb[0][k*8+l]
+                                        r = int(y + 1.402*cr + 128) % 256
+                                        b = int(y + 1.772*cb + 128) % 256
+                                        g = int(y - 0.344*cr - 0.714*cb + 128) % 256
+                                        rowData[(heightIndex+k)*self.width+widthIndex+l] = [r, g, b]
+                                    else:
+                                        if dataY[i*horzY+j][k*8+l] != 0 or dataCr[0][k*8+l] != 0 or dataCb[0][k*8+l] !=0:
+                                            LOGGER.log(CustomLoggingLevel.OTHER_DATA, "[ScanData] Unsual expand data in edge(right) of MCU")
+                            else:
+                                if dataY[i*horzY+j][k*8+l] != 0 or dataCr[0][k*8+l] != 0 or dataCb[0][k*8+l] !=0:
+                                    LOGGER.log(CustomLoggingLevel.OTHER_DATA, "[ScanData] Unsual expand data in edge(bottom) of MCU")
+ 
         self.clean_bitstream_remainder()
-        return ''
+        print rowData
+        return rowData
 
     # read mcu block data in scanData, return mcu block data with [Y, Cr, Cb] 
     def read_mcu_block(self, numY, numCr, numCb):
@@ -614,4 +626,4 @@ class JPGDetector():
 
         for d in self.fileObject.redundancy():
             self.showextradata(d['data'], d['start'])
-        return rowData, self.channel*8, self.channel
+        return [RowData(rowData, self.channel, self.width, self.height)]
