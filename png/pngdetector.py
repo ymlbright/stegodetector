@@ -20,7 +20,7 @@ except:
     from common.imageshow import ImageShow
     from common.rowdata import RowData
 
-
+chunk_count = {"IHDR":0,"IDAT":0,"PLTE":0,"IEND":0,"tRNS":0,"cHRM":0,"sRGB":0,"iCCP":0,"gAMA":0,"sBIT":0,"tExt":0,"iTXt":0,"zTXt":0,"bKGD":0,"hIST":0,"pHYs":0,"sPLT":0,"tIME":0}
 
 class PngDetector():
     def __init__(self,fileObject):
@@ -31,9 +31,9 @@ class PngDetector():
 
     def isPng(self,fileObject):
         if fileObject.read(8)!='\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
-            LOGGER.error('not a png file')
+            LOGGER.error('Not a png file')
         else:
-            LOGGER.info('find png start mark')
+            LOGGER.info('Find png start mark')
 
 
     def get_ihdr_info(self,data):
@@ -215,7 +215,7 @@ class PngDetector():
     def parseChunk(self):
         chunk = self.getChunkInfo(self.fileObject)
         self.data = ''
-        chunk_count = {'IHDR':0, "IDAT":0, "IEND":0}
+        #chunk_count = {'IHDR':0, "IDAT":0, "IEND":0}
         while chunk:
             # LOGGER.info(chunk)
             if chunk['name']=='\x49\x48\x44\x52':#'IHDR'
@@ -238,8 +238,8 @@ class PngDetector():
 
         #print the chunk info
         for idx,name in enumerate(chunk_count):
-
-            LOGGER.info('detect png %s chunk %d times' %(name,chunk_count[name]))
+            if chunk_count[name] > 0:
+                LOGGER.info('Detect png %s chunk %d times' %(name,chunk_count[name]))
             if name=='IHDR':
                 LOGGER.info('PNG Image Header Info:\n' + str(self.headerInfo))
     def getPicPixels(self):
