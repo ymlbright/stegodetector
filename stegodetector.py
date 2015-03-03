@@ -8,6 +8,7 @@ from common.fileobject import FileObject
 from common.fastscan import fastscan
 from common.logger import *
 from bmp.bmpdetector import BMPDetector
+from gif.gifdetector import GIFDetector
 from jpg.jpgdetector import JPGDetector
 import Image
 
@@ -31,10 +32,10 @@ class StegoDetector():
     fastMod = False
 
     mimeMap = {
-        #'png' : PNGDetector, 
-        'bmp' : BMPDetector,
-        'jpg' : JPGDetector,
-        #'gif' : GIFDetector
+        # 'png' : PNGDetector,
+        'bmp': BMPDetector,
+        'jpg': JPGDetector,
+        'gif': GIFDetector
         }
 
     # init detect params
