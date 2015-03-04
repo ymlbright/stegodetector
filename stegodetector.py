@@ -8,6 +8,7 @@ from common.fileobject import FileObject
 from common.fastscan import fastscan
 from common.logger import *
 from bmp.bmpdetector import BMPDetector
+from gif.gifdetector import GIFDetector
 from jpg.jpgdetector import JPGDetector
 import Image
 
@@ -31,10 +32,10 @@ class StegoDetector():
     fastMod = False
 
     mimeMap = {
-        #'png' : PNGDetector, 
-        'bmp' : BMPDetector,
-        'jpg' : JPGDetector,
-        #'gif' : GIFDetector
+        # 'png' : PNGDetector,
+        'bmp': BMPDetector,
+        'jpg': JPGDetector,
+        'gif': GIFDetector
         }
 
     # init detect params
@@ -68,11 +69,14 @@ class StegoDetector():
 
         if not self.fastMod:
             imgDetector = self.mimeMap[self.fileType](self.fileOject)
-            #[[rowData, bitsPerPixel, channel, width, height] , ... ] 
+            # [[rowData, bitsPerPixel, channel, width, height] , ... ]
             a = imgDetector.detect()[0]
-            #return
             x = Image.new('RGB',(a.width, a.height),(255,255,255))
+
             print a.rowData[:16]
+
+            x = Image.new('RGB',(a.width, a.height),(0,0,0))
+
             index = 0
             for j in range(a.height):
                 for i in range(a.width):
@@ -81,7 +85,9 @@ class StegoDetector():
                     b = a.rowData[index][2]
                     x.putpixel((i,j),(r,g,b))
                     index += 1
+
             x.save('save.bmp','bmp')
+            
             # do some check on rowdata
 # 237, 27, 36
 t = StegoDetector(filePath='test4.jpg', fileType='jpg')
