@@ -69,9 +69,9 @@ class StegoDetector():
 
         if not self.fastMod:
             imgDetector = self.mimeMap[self.fileType](self.fileOject)
-            #[[rowData, bitsPerPixel, channel, width, height] , ... ] 
+            # [[rowData, bitsPerPixel, channel, width, height] , ... ]
             a = imgDetector.detect()[0]
-            #return
+            # return
             x = Image.new('RGB',(a.width, a.height),(0,0,0))
             index = 0
             for j in range(a.height):
@@ -81,7 +81,7 @@ class StegoDetector():
                     b = a.rowData[index][2]
                     x.putpixel((i,j),(r,g,b))
                     index += 1
-            x.save('save.bmp','BMP')
+            x.save('save.bmp', 'BMP')
             # do some check on rowdata
 
 t = StegoDetector(filePath='test.jpg', fileType='jpg')
