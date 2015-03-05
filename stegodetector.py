@@ -73,10 +73,6 @@ class StegoDetector():
             a = imgDetector.detect()[0]
             x = Image.new('RGB',(a.width, a.height),(255,255,255))
 
-            print a.rowData[:16]
-
-            x = Image.new('RGB',(a.width, a.height),(0,0,0))
-
             index = 0
             for j in range(a.height):
                 for i in range(a.width):
@@ -89,8 +85,8 @@ class StegoDetector():
             x.save('save.bmp','bmp')
             
             # do some check on rowdata
-# 237, 27, 36
-t = StegoDetector(filePath='test4.jpg', fileType='jpg')
+
+t = StegoDetector(filePath='test2.jpg', fileType='jpg')
 t.start()
 
 

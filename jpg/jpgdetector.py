@@ -441,9 +441,7 @@ class JPGDetector():
         vBlock = self.height / (vertY*8)
         if self.height % (vertY*8) != 0 :
             vBlock += 1
-        # read mcuBlock
 
-################################################IDHCT convert
         widthIndex = 0
         heightIndex = 0
         unsualDataFlagRight = False
@@ -469,6 +467,7 @@ class JPGDetector():
                                         b = self.round(y + 1.772*cb + 128)
                                         g = self.round(y - 0.34414*cb - 0.71414*cr + 128)
                                         rowData[(heightIndex+k)*self.width+widthIndex+l] = [r, g, b]
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,'Please wait, decoding ... (%d/%d)'%(vb, vBlock))
         self.clean_bitstream_remainder()
         return rowData
 
@@ -492,7 +491,6 @@ class JPGDetector():
         # quantizationTableCr = self.quantizationTable[self.colorQuantization[2]['TableID']]
         # quantizationTableCb = self.quantizationTable[self.colorQuantization[3]['TableID']]
 
-        # read Y
         for i in range(numY):
             [self.baseY, d] = self.read_color_block(self.quantizationTable[self.colorQuantization[1]['TableID']], self.huffmanTable[0], self.huffmanTable[2], self.baseY)
             dataY.append(self.martrix_idct(d))
@@ -514,27 +512,24 @@ class JPGDetector():
             if d in huffmanTableDC.keys() and i == huffmanTableDC[d][0]:
                 self.read_bitstream(i, True)
                 break
-        base += self.dc_value_decode(self.read_bitstream(huffmanTableDC[d][1], True), huffmanTableDC[d][1])
+        base += self.dc_value_decode(self.read_bitstream(huffmanTableDC[d][1], True), huffmanTableDC[d][1]) * quantizationTable[0]
         data = [0 for i in range(64)]
-        data[0] = base * quantizationTable[0]
+        data[0] = base
         # read AC part
         dataIndex = 1
         while dataIndex < 64:
             for i in range(1,17):
                 d = self.read_bitstream(i)
                 if d in huffmanTableAC.keys() and i == huffmanTableAC[d][0]:
-                    dataLength = huffmanTableAC[d][1] & 0xf
-                    if dataIndex + (huffmanTableAC[d][1] >> 4) < 64:
-                        self.read_bitstream(i, True)
-                    else:
-                        dataLength = 0
+                    self.read_bitstream(i, True)
                     break
-            if dataLength == 0:
+            dataLength = huffmanTableAC[d][1] & 0xf
+            if dataLength == 0 and huffmanTableAC[d][1] != 0xf0:
                 break
             else:
                 ac = self.dc_value_decode(self.read_bitstream(dataLength, True), dataLength)
                 dataIndex += huffmanTableAC[d][1] >> 4
-                data[zigZagShiftTable[dataIndex]] = quantizationTable[dataIndex] * ac
+                data[zigZagShiftTable[dataIndex]] = ac * quantizationTable[dataIndex]
             dataIndex += 1
         return base, data
 
@@ -545,8 +540,10 @@ class JPGDetector():
                 r = 0
                 for u in range(8):
                     for v in range(8):
+                        if martrix[u*8+v] == 0:
+                            continue
                         if u+v == 0:
-                            r += 0.125 * martrix[u*8+v] * idctCosTable[i][u] * idctCosTable[j][v]
+                            r += 0.125 * martrix[0]
                         elif u == 0 or v == 0:
                             r += 0.17678 * martrix[u*8+v] * idctCosTable[i][u] * idctCosTable[j][v]
                         else:
