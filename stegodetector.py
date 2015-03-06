@@ -84,5 +84,5 @@ class StegoDetector():
             x.save('save.bmp', 'BMP')
             # do some check on rowdata
 
-t = StegoDetector(filePath='2.gif', fileType='gif')
+t = StegoDetector(filePath='test.jpg', fileType='jpg')
 t.start()
