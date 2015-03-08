@@ -8,6 +8,7 @@ from common.fileobject import FileObject
 from common.logger import LOGGER, CustomLoggingLevel
 from common.rowdata import RowData
 from jpgenum import *
+from math import *
 
 class JPGDetector():
 
@@ -422,6 +423,7 @@ class JPGDetector():
         scanY = horzY * vertY
         scanCr = horzCr * vertCr
         scanCb = horzCb * vertCb
+        LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "scanY: %d, scanCr: %d, scanCb: %d."%(scanY, scanCr, scanCb))
         self.baseY = 0
         self.baseCr = 0
         self.baseCb = 0
@@ -433,19 +435,23 @@ class JPGDetector():
             LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, 'Start to decode scan data.')
 
         # calc block number
-        hBlock = self.width / horzY / 8
+        hBlock = self.width / (horzY*8)
         if self.width % (horzY*8) != 0 :
             hBlock += 1
-        vBlock = self.height / vertY / 8
+        vBlock = self.height / (vertY*8)
         if self.height % (vertY*8) != 0 :
             vBlock += 1
-        # read mcuBlock
 
         widthIndex = 0
         heightIndex = 0
+        unsualDataFlagRight = False
+        unsualDataFlagBotton = False
         for vb in range(vBlock):
             for hb in range(hBlock):
-                [dataY, dataCr, dataCb] = self.read_mcu_block(scanY,scanCr,scanCb)
+                dataY = []
+                dataCr = []
+                dataCb = []
+                [dataY, dataCr, dataCb] = self.read_mcu_block(scanY, scanCr, scanCb, dataY, dataCr, dataCb)
                 for i in range(vertY):
                     heightIndex = (vb*vertY + i)*8
                     for j in range(horzY):
@@ -457,49 +463,45 @@ class JPGDetector():
                                         y = dataY[i*horzY+j][k*8+l]
                                         cr = dataCr[0][k*8+l]
                                         cb = dataCb[0][k*8+l]
-                                        r = int(y + 1.402*cr + 128) % 256
-                                        b = int(y + 1.772*cb + 128) % 256
-                                        g = int(y - 0.344*cr - 0.714*cb + 128) % 256
+                                        r = self.round(y + 1.402*cr + 128)
+                                        b = self.round(y + 1.772*cb + 128)
+                                        g = self.round(y - 0.34414*cb - 0.71414*cr + 128)
                                         rowData[(heightIndex+k)*self.width+widthIndex+l] = [r, g, b]
-                                    else:
-                                        if dataY[i*horzY+j][k*8+l] != 0 or dataCr[0][k*8+l] != 0 or dataCb[0][k*8+l] !=0:
-                                            LOGGER.log(CustomLoggingLevel.OTHER_DATA, "[ScanData] Unsual expand data in edge(right) of MCU")
-                            else:
-                                if dataY[i*horzY+j][k*8+l] != 0 or dataCr[0][k*8+l] != 0 or dataCb[0][k*8+l] !=0:
-                                    LOGGER.log(CustomLoggingLevel.OTHER_DATA, "[ScanData] Unsual expand data in edge(bottom) of MCU")
- 
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,'Please wait, decoding ... (%d/%d)'%(vb, vBlock))
         self.clean_bitstream_remainder()
-        print rowData
         return rowData
 
+    def round(self, x):
+        if x < 0:
+            return 0
+        elif x > 255:
+            return 255
+        else:
+            return int(x)
+
     # read mcu block data in scanData, return mcu block data with [Y, Cr, Cb] 
-    def read_mcu_block(self, numY, numCr, numCb):
+    def read_mcu_block(self, numY, numCr, numCb, dataY, dataCr, dataCb):
         # huffmanTableY_DC = self.huffmanTable[0]
         # huffmanTableY_AC = self.huffmanTable[2]
         # huffmanTableCr_DC = self.huffmanTable[1]
         # huffmanTableCr_AC = self.huffmanTable[3]
         # huffmanTableCb_DC = self.huffmanTable[1]
         # huffmanTableCb_AC = self.huffmanTable[3]
-        quantizationTableY = self.quantizationTable[self.colorQuantization[1]['TableID']]
-        quantizationTableCr = self.quantizationTable[self.colorQuantization[2]['TableID']]
-        quantizationTableCb = self.quantizationTable[self.colorQuantization[3]['TableID']]
-        data = []
-        dataY = []
-        dataCr = []
-        dataCb = []
+        # quantizationTableY = self.quantizationTable[self.colorQuantization[1]['TableID']]
+        # quantizationTableCr = self.quantizationTable[self.colorQuantization[2]['TableID']]
+        # quantizationTableCb = self.quantizationTable[self.colorQuantization[3]['TableID']]
 
-        # read Y
         for i in range(numY):
-            [self.baseY, d] = self.read_color_block(quantizationTableY, self.huffmanTable[0], self.huffmanTable[2], self.baseY)
-            dataY.append(d)
+            [self.baseY, d] = self.read_color_block(self.quantizationTable[self.colorQuantization[1]['TableID']], self.huffmanTable[0], self.huffmanTable[2], self.baseY)
+            dataY.append(self.martrix_idct(d))
         # read Cr
-        for i in range(numCr):
-            [self.baseCr, d] = self.read_color_block(quantizationTableCr, self.huffmanTable[1], self.huffmanTable[3], self.baseCr)
-            dataCr.append(d)
-        # read Cb
         for i in range(numCb):
-            [self.baseCb, d] = self.read_color_block(quantizationTableCb, self.huffmanTable[1], self.huffmanTable[3], self.baseCb)
-            dataCb.append(d)
+            [self.baseCb, d] = self.read_color_block(self.quantizationTable[self.colorQuantization[2]['TableID']], self.huffmanTable[1], self.huffmanTable[3], self.baseCb)
+            dataCb.append(self.martrix_idct(d))
+        # read Cb
+        for i in range(numCr):
+            [self.baseCr, d] = self.read_color_block(self.quantizationTable[self.colorQuantization[3]['TableID']], self.huffmanTable[1], self.huffmanTable[3], self.baseCr)
+            dataCr.append(self.martrix_idct(d))
 
         return dataY, dataCr, dataCb
 
@@ -510,27 +512,44 @@ class JPGDetector():
             if d in huffmanTableDC.keys() and i == huffmanTableDC[d][0]:
                 self.read_bitstream(i, True)
                 break
-        base += self.dc_value_decode(self.read_bitstream(huffmanTableDC[d][1], True), huffmanTableDC[d][1])
-        baseT = base * quantizationTable[0] / self.dctTransform
-        data = [baseT for i in range(64)]
-
+        base += self.dc_value_decode(self.read_bitstream(huffmanTableDC[d][1], True), huffmanTableDC[d][1]) * quantizationTable[0]
+        data = [0 for i in range(64)]
+        data[0] = base
         # read AC part
-        dataIndex = 0
-        for i in range(63):
+        dataIndex = 1
+        while dataIndex < 64:
             for i in range(1,17):
                 d = self.read_bitstream(i)
                 if d in huffmanTableAC.keys() and i == huffmanTableAC[d][0]:
                     self.read_bitstream(i, True)
                     break
             dataLength = huffmanTableAC[d][1] & 0xf
-            if dataLength == 0:
+            if dataLength == 0 and huffmanTableAC[d][1] != 0xf0:
                 break
             else:
-                ac = self.read_bitstream(dataLength, True)
+                ac = self.dc_value_decode(self.read_bitstream(dataLength, True), dataLength)
                 dataIndex += huffmanTableAC[d][1] >> 4
-                data[dataIndex] += ac * quantizationTable[dataIndex] / self.dctTransform
+                data[zigZagShiftTable[dataIndex]] = ac * quantizationTable[dataIndex]
             dataIndex += 1
         return base, data
+
+    def martrix_idct(self, martrix):
+        dct = []
+        for i in range(8):
+            for j in range(8):
+                r = 0
+                for u in range(8):
+                    for v in range(8):
+                        if martrix[u*8+v] == 0:
+                            continue
+                        if u+v == 0:
+                            r += 0.125 * martrix[0]
+                        elif u == 0 or v == 0:
+                            r += 0.17678 * martrix[u*8+v] * idctCosTable[i][u] * idctCosTable[j][v]
+                        else:
+                            r += 0.25 * martrix[u*8+v] * idctCosTable[i][u] * idctCosTable[j][v]
+                dct.append(r)
+        return dct
 
     def read_bitstream(self, bitLength, changeFlag = False): 
         if bitLength == 0:
@@ -540,24 +559,30 @@ class JPGDetector():
             self.bitStreamStart -= 8
         expendLength = len(self.streamBuffer)*8 - self.bitStreamStart - bitLength
         while expendLength < 0:
-            d = self.scanData[self.scanDataIndex]
-            self.scanDataIndex += 1
-            if d == '\xff':
-                n = self.scanData[self.scanDataIndex]
+            try:
+                d = self.scanData[self.scanDataIndex]
                 self.scanDataIndex += 1
-                tag = d + n
-                if n == '\x00':
+                if d == '\xff':
+                    n = self.scanData[self.scanDataIndex]
+                    self.scanDataIndex += 1
+                    tag = d + n
+                    if n == '\x00':
+                        self.streamBuffer.append(ord(d))
+                        expendLength += 8
+                    elif '\xd0' <= n <= '\xf7':
+                        self.baseY = 0
+                        self.baseCr = 0
+                        self.baseCb = 0
+                        print 'RST FOUND'
+                    else:
+                        self.unexpected_tag(tag, '?-In Scandata-?')
+                else:
                     self.streamBuffer.append(ord(d))
                     expendLength += 8
-                elif '\xd0' <= n <= '\xf7':
-                    self.baseY = 0
-                    self.baseCr = 0
-                    self.baseCb = 0
-                else:
-                    self.unexpected_tag(tag, '?-In Scandata-?')
-            else:
-                self.streamBuffer.append(ord(d))
+            except IndexError:
+                self.streamBuffer.append(0)
                 expendLength += 8
+            
         bitNewStart = self.bitStreamStart + bitLength
         if self.bitStreamStart + bitLength > 8:
             ret = self.streamBuffer[0] & myBitStreamMaskR[8-self.bitStreamStart]
