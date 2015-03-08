@@ -7,9 +7,12 @@ import os
 from common.fileobject import FileObject
 from common.fastscan import fastscan
 from common.logger import *
+from common.imageshow import ImageShow
 from bmp.bmpdetector import BMPDetector
 from gif.gifdetector import GIFDetector
 from jpg.jpgdetector import JPGDetector
+from png.pngdetector import PNGDetector
+
 import Image
 
 class StegoDetector():
@@ -32,7 +35,7 @@ class StegoDetector():
     fastMod = False
 
     mimeMap = {
-        # 'png' : PNGDetector,
+        'png' : PNGDetector,
         'bmp': BMPDetector,
         'jpg': JPGDetector,
         'gif': GIFDetector
@@ -69,20 +72,22 @@ class StegoDetector():
 
         if not self.fastMod:
             imgDetector = self.mimeMap[self.fileType](self.fileOject)
+            imageShow = ImageShow(imgDetector.detect())
+            imageShow.show()
             # [[rowData, bitsPerPixel, channel, width, height] , ... ]
-            a = imgDetector.detect()[0]
-            # return
-            x = Image.new('RGB',(a.width, a.height),(0,0,0))
-            index = 0
-            for j in range(a.height):
-                for i in range(a.width):
-                    r = a.rowData[index][0]
-                    g = a.rowData[index][1]
-                    b = a.rowData[index][2]
-                    x.putpixel((i,j),(r,g,b))
-                    index += 1
-            x.save('save.bmp', 'BMP')
+            # a = imgDetector.detect()[0]
+            # # return
+            # x = Image.new('RGB',(a.width, a.height),(0,0,0))
+            # index = 0
+            # for j in range(a.height):
+            #     for i in range(a.width):
+            #         r = a.rowData[index][0]
+            #         g = a.rowData[index][1]
+            #         b = a.rowData[index][2]
+            #         x.putpixel((i,j),(r,g,b))
+            #         index += 1
+            # x.save('save.bmp', 'BMP')
             # do some check on rowdata
 
-t = StegoDetector(filePath='test.jpg', fileType='jpg')
+t = StegoDetector(filePath='pic/png3.png', fileType='png')
 t.start()
