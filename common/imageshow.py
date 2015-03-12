@@ -19,7 +19,7 @@ class ImageShow():
         if len(pic.picArray)==0:
             LOGGER.error("no picture data")
             return
-        LOGGER.info("show picture...")
+        LOGGER.info("Showing picture...")
         for pic in pic.picArray:
             img = Image.new("RGBA", (pic.width,pic.height))
             pix = img.load()

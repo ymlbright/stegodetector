@@ -35,7 +35,7 @@ class MyTestCase(unittest.TestCase):
         #     cnt += 1
 
     def test_get_data(self):
-        detector = GIFDetector(FileObject("1.gif"))
+        detector = GIFDetector(FileObject("2.gif"))
         # images = detector.get_images()
         images = detector.detect()
         cnt = 0

@@ -37,7 +37,7 @@ class CodeReader():
 
 class GIFDetector():
     def __init__(self, file_object):
-        LOGGER.addHandler(logging.StreamHandler())
+        # file_object.addHandler(logging.StreamHandler())
         self.fileObject = file_object
         if file_object.read(3) != 'GIF':
             LOGGER.error("File is not a gif file")
@@ -66,7 +66,7 @@ class GIFDetector():
         else:
             self.globalColorTable = []
 
-        LOGGER.info("global table size is %d" % len(self.globalColorTable))
+        LOGGER.log(CustomLoggingLevel.OTHER_DATA, "global table size is %d" % len(self.globalColorTable))
 
         for i in range(len(self.globalColorTable)):
 
@@ -78,11 +78,12 @@ class GIFDetector():
             tag = file_object.read_uint8()
 
             if tag == 0x3b:
-
+                LOGGER.log(CustomLoggingLevel.OTHER_DATA, "gif end");
                 break  # end of gif
 
             if tag == 0x2c:  # start of a image descriptor
                 # LOGGER.info("image descriptor")
+                LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "image descriptor")
                 image["xOffset"] = file_object.read_uint16()
                 image["yOffset"] = file_object.read_uint16()
 
@@ -112,15 +113,15 @@ class GIFDetector():
                     for i in range(len(image["localColorTable"])):
                         for j in range(3):  # 0 red 1 green 2 blue
                             image["localColorTable"][i][j] = file_object.read_uint8()
-            elif tag == 0x21:  # Graphic Control Extension.
+            elif tag == 0x21:
                 if self.version != "89a":
-                    LOGGER.warning("not version 89a but has extension segment.")
+                    LOGGER.log(CustomLoggingLevel.OTHER_DATA, "not version 89a but has extension segment.")
                 sub_tag = file_object.read_uint8()
                 if sub_tag == 0xF9:  # Graphic Control Extension.
-                    LOGGER.info("Graphic Control Extension")
+                    LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "Graphic Control Extension")
                     block_size = file_object.read_uint8()
                     if block_size != 4:
-                        LOGGER.warning("block size is not 4 in Graphic Control Extension")
+                        LOGGER.log(CustomLoggingLevel.OTHER_DATA, "block size is not 4 in Graphic Control Extension")
                     control = {}
                     mask = file_object.read_uint8()
                     control["transparentFlag"] = mask & 0b1
@@ -147,7 +148,7 @@ class GIFDetector():
                                    % self.fileObject.cur())
                     image["control"] = control
                 elif sub_tag == 0xFE:  # Comment Extension.
-                    LOGGER.info("Comment Extension.")
+                    LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "Comment Extension.")
                     if "comment" not in image:
                         image["comment"] = ""
                     while True:
@@ -157,7 +158,7 @@ class GIFDetector():
                         image["comment"] += tmp
                     LOGGER.log(CustomLoggingLevel.ASCII_DATA, image["comment"])
                 elif sub_tag == 0x01:  # plain text Extension
-                    LOGGER.info("plain text Extension")
+                    LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "plain text Extension")
                     block_size = file_object.read_uint8()
                     if block_size != 12:
                         LOGGER.warning("block size is not 12 in plain text")
@@ -177,7 +178,7 @@ class GIFDetector():
                     image["text"] = text
                     LOGGER.log(CustomLoggingLevel.ASCII_DATA, image["text"])
                 elif sub_tag == 0xFF:  # Application Extension.
-                    LOGGER.info("Application Extension.")
+                    LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "Application Extension.")
                     block_size = file_object.read_uint8()
                     if block_size != 11:
                         LOGGER.log(CustomLoggingLevel.OTHER_DATA,
@@ -194,10 +195,10 @@ class GIFDetector():
                     if terminator != 0:
                         LOGGER.log(CustomLoggingLevel.OTHER_DATA, "terminator is not 0 in Application Extension")
                 else:
-                    LOGGER.log(CustomLoggingLevel.OTHER_DATA, "[0x%x] unknown extension at" % self.fileObject.cur())
+                    LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "[0x%x] unknown extension at" % self.fileObject.cur())
             else:  # DATA
                 # LOGGER.info("DATA")
-
+                LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, "DATA")
                 image["LZWMinimumCodeSize"] = tag
 
                 image["data"] = []

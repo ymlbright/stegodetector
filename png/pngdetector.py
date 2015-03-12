@@ -7,13 +7,14 @@ import zlib
 import math
 from PIL import Image
 import cStringIO
+import sys
+import ctypes
 try:
     from common.fileobject import FileObject
     from common.logger import *
     from common.imageshow import ImageShow
     from common.rowdata import RowData
 except:
-    import sys
     sys.path.append("..")
     from common.fileobject import FileObject
     from common.logger import *
@@ -22,18 +23,25 @@ except:
 
 
 
-class PngDetector():
+
+class PNGDetector():
     def __init__(self,fileObject):
         self.fileObject = fileObject
+        self.streamCur = 0
         LOGGER.addHandler(stream_handler)
         self.headerInfo = {}
+        self.FILE_END = 3
+        self.FILE_LEGAL = 2
+        self.FILE_OVER = 1
+        self.chunk_count = {"IHDR":0,"IDAT":0,"PLTE":0,"IEND":0,"tRNS":0,"cHRM":0,"sRGB":0,"iCCP":0,"gAMA":0,"sBIT":0,"tEXt":0,"iTXt":0,"zTXt":0,"bKGD":0,"hIST":0,"pHYs":0,"sPLT":0,"tIME":0}
 
 
     def isPng(self,fileObject):
         if fileObject.read(8)!='\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
-            LOGGER.error('not a png file')
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,'Not a png file')
         else:
-            LOGGER.info('find png start mark')
+            LOGGER.info('Find png start mark')
+        self.streamCur = self.fileObject.cur()
 
 
     def get_ihdr_info(self,data):
@@ -56,14 +64,69 @@ class PngDetector():
         self.height = self.headerInfo['height']
 
 
-    def getChunkInfo(self,fileObject):
+    def checkChunkIsValid(self,chunkInfo):
+        names  =  self.chunk_count.keys()
+        if chunkInfo['name'] not in names:
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,' At 0x%.8x,Chunk name %s isn\'t a valid chunk name'%(self.streamCur+4,chunkInfo['name']) )
+            return False
+        else:
+            self.chunk_count[chunkInfo['name']] += 1
+        crc = ctypes.c_uint(zlib.crc32(chunkInfo['name']+chunkInfo['data'])).value
+        # print hex(int(crc)),chunkInfo['crc']
+        if hex(int(crc)) != chunkInfo['crc']:
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,'Not a valid crc value:%s at 0x%.8x'%(chunkInfo['crc'],self.streamCur+8+len(chunkInfo['data'])))
+        return True
+
+    def checkReadValid(self,length):
+        if self.fileObject.size == self.fileObject.cur():
+            return self.FILE_END
+        elif self.fileObject.size >= self.fileObject.cur() + length:
+            return self.FILE_LEGAL
+        else:
+            raise IOError('Can\'t read 0x%x bytes from  0x%.8x'%(length,self.fileObject.cur()))
+
+
+    def getChunkInfo(self):
         chunkInfo = {}
         try:
+            self.checkReadValid(4)
             chunkInfo['length'] = struct.unpack('!I',self.fileObject.read(4))[0]
+        
+
+            self.checkReadValid(4)
             chunkInfo['name'] = self.fileObject.read(4)
+            
+
+            self.checkReadValid(chunkInfo['length'])
             chunkInfo['data'] = self.fileObject.read(chunkInfo['length'])
+            
+
+            self.checkReadValid(4)
             chunkInfo['crc'] = hex(struct.unpack('!I',self.fileObject.read(4))[0])
-        except:
+            if not self.checkChunkIsValid(chunkInfo):
+                self.streamCur += 1
+                self.fileObject.change_cur(self.streamCur)
+                self.getChunkInfo()
+            else:
+                self.streamCur = self.fileObject.cur()
+            # LOGGER.info("fileObject stream is 0x%.8x"%(self.fileObject.cur()))
+            # LOGGER.info("self file stream is 0x%.8x"%(self.streamCur))
+            # checkResult = self.checkChunkIsValid(chunkInfo)
+            # if  checkResult==False :
+            #     self.streamCur += 1
+            #     self.fileObject.change_cur(self.streamCur)
+            #     self.getChunkInfo()
+            # elif checkResult==True:
+            #     # LOGGER.info("cur() :  %x"%self.fileObject.cur())
+            #     self.streamCur = self.fileObject.cur()
+
+        except IOError,e:
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,e)
+            if self.fileObject.size >= self.streamCur :
+                self.streamCur += 1
+                self.fileObject.change_cur(self.streamCur)
+                self.getChunkInfo()
+        except struct.error,e:
             pass
         return chunkInfo
 
@@ -212,34 +275,35 @@ class PngDetector():
                 rData.append(pix)
         return [RowData(rData, self.bpp, self.width, self.height)]
 
+    def checkRedundancy(self):
+        if self.fileObject.size > self.fileObject.cur():
+            LOGGER.error("Find Redundancy data at 0x%.8x"%self.fileObject.cur())
+            
     def parseChunk(self):
-        chunk = self.getChunkInfo(self.fileObject)
+        chunk = self.getChunkInfo()
         self.data = ''
-        chunk_count = {'IHDR':0, "IDAT":0, "IEND":0}
+        #self.chunk_count = {'IHDR':0, "IDAT":0, "IEND":0}
         while chunk:
+
             # LOGGER.info(chunk)
             if chunk['name']=='\x49\x48\x44\x52':#'IHDR'
              
-                chunk_count['IHDR'] += 1
+               # self.chunk_count['IHDR'] += 1
                 self.get_ihdr_info(chunk['data'])
             
             if chunk['name']=='\x49\x44\x41\x54':#'IDAT'
                 #LOGGER.info('png IDAT chunk detected')
-                chunk_count['IDAT'] += 1
+                #self.chunk_count['IDAT'] += 1
                 self.data +=  chunk['data']
+            if chunk['name']=='IEND':
+                self.checkRedundancy()
 
-            if chunk['name']=='\x49\x45\x4e\x44':#'IEND'
-                #LOGGER.info('png IEND chunk detected')
-                chunk_count['IEND'] += 1
-
-            if chunk['name'] == '':
-                pass
-            chunk = self.getChunkInfo(self.fileObject)
+            chunk = self.getChunkInfo()
 
         #print the chunk info
-        for idx,name in enumerate(chunk_count):
-
-            LOGGER.info('detect png %s chunk %d times' %(name,chunk_count[name]))
+        for idx,name in enumerate(self.chunk_count):
+            if self.chunk_count[name] > 0:
+                LOGGER.info('Detect png %s chunk %d times' %(name,self.chunk_count[name]))
             if name=='IHDR':
                 LOGGER.info('PNG Image Header Info:\n' + str(self.headerInfo))
     def getPicPixels(self):
@@ -260,7 +324,7 @@ class PngDetector():
 
 
 if __name__ == '__main__':
-    png = PngDetector(FileObject('../pic/png4.png'))
+    png = PNGDetector(FileObject('../pic/png2.png'))
     show = ImageShow(png.detect())
     show.show()
     # show.show()
