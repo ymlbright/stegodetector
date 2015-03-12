@@ -26,7 +26,7 @@ def asc_detect(filename, min_length=5):
             pre = i
             if length >= min_length:
                 LOGGER.log(CustomLoggingLevel.ASCII_DATA,
-                           "[ascii] [0x%x] " % i + data)
+                           "[ascii] at pos 0x%x: \n" % i +data)
             data = ""
         else:
             data += chr(byte)
