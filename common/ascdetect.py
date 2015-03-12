@@ -15,7 +15,7 @@ def asc_detect(filename, min_length=5):
                          " "+'\n'+'\t'+'\r'
 
         return c < 128 and chr(c) in readable_chars
-    LOGGER.addHandler(logging.StreamHandler())
+    # LOGGER.addHandler(logging.StreamHandler())
     file_object = FileObject(filename)
     pre = -1
     data = ""
@@ -26,7 +26,7 @@ def asc_detect(filename, min_length=5):
             pre = i
             if length >= min_length:
                 LOGGER.log(CustomLoggingLevel.ASCII_DATA,
-                           "[ascii] at pos 0x%x: \n" % i +data)
+                           "[ascii] at pos 0x%x:\n" % i +data)
             data = ""
         else:
             data += chr(byte)
@@ -35,4 +35,4 @@ def asc_detect(filename, min_length=5):
 
 
 if __name__ == '__main__':
-    asc_detect("../gif/3.jpg", 8)
+    asc_detect("../!index.jpg", 10)
