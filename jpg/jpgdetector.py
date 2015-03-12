@@ -135,6 +135,8 @@ class JPGDetector():
         magic = self.fileObject.read(6)
         if magic != 'Exif\x00\x00':
             LOGGER.warning('[0x%x] Unbale to process magic %s in APP1.'%(self.fileObject.cur(), magic))
+            self.fileObject.read(length-8)
+            return self.find_tag('APP1')
         self.read_tiff(length - 8, 'Exif')
         self.fileObject.change_cur(backCurPos+length)
         return self.find_tag('APP1')
@@ -369,7 +371,7 @@ class JPGDetector():
                     else:
                         LOGGER.log(CustomLoggingLevel.IMAGE_INFO, '[%s - %s](%s)> Hex:%s'%(tagName, exifEnumTag[dirTag], tiffEnumDataType[dataFormat], data.encode('hex')))
                 except KeyError or IndexError:
-                    LOGGER.error('[0x%x] Unable to decode dataformat or entrytag in tiff data, tagName: %s, dirTag: 0x%x, dataFormat: 0x%x, directory: %d/%d.'%(self.fileObject.cur(), tagName, dirTag, dataFormat, i, entryCount))
+                    LOGGER.warning('[0x%x] Unable to decode dataformat or entrytag in tiff data, tagName: %s, dirTag: 0x%x, dataFormat: 0x%x, directory: %d/%d.'%(self.fileObject.cur(), tagName, dirTag, dataFormat, i, entryCount))
             dirCount += 1
             dirEntryPos = p_read_uint32(tiffStartPos+dirEntryPos+2+12*entryCount)
 
@@ -467,7 +469,7 @@ class JPGDetector():
                                         b = self.round(y + 1.772*cb + 128)
                                         g = self.round(y - 0.34414*cb - 0.71414*cr + 128)
                                         rowData[(heightIndex+k)*self.width+widthIndex+l] = [r, g, b]
-            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,'Please wait, decoding ... (%d/%d)'%(vb, vBlock))
+            LOGGER.info('Please wait, decoding ... (%d/%d)'%(vb, vBlock))
         self.clean_bitstream_remainder()
         return rowData
 

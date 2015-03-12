@@ -53,7 +53,7 @@ class StegoDetector():
     # start to detect a image file
     def start(self):
         stream_handler.setLevel(self.reportLevel)
-        errorHandler.ignoreError = False
+        errorHandler.ignoreError = True
         LOGGER.addHandler(stream_handler)
         LOGGER.addHandler(errorHandler)
 
@@ -89,5 +89,5 @@ class StegoDetector():
             # x.save('save.bmp', 'BMP')
             # do some check on rowdata
 
-t = StegoDetector(filePath='pic/png3.png', fileType='png')
+t = StegoDetector(filePath='C:\\Users\\Brightx\\Desktop\\test\\!sctf.jpg', fileType='jpg')
 t.start()
