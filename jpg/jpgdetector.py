@@ -551,6 +551,8 @@ class JPGDetector():
                         else:
                             r += 0.25 * martrix[u*8+v] * idctCosTable[i][u] * idctCosTable[j][v]
                 dct.append(r)
+        if self.scanDataIndex < self.scanDataLength:
+            self.showextradata(self.scanData[self.scanDataIndex:], self.scanDataPos + self.scanDataIndex)
         return dct
 
     def read_bitstream(self, bitLength, changeFlag = False): 
@@ -623,6 +625,7 @@ class JPGDetector():
 
     def read_scandata(self):
         curPos = self.fileObject.cur()
+        self.scanDataPos = curPos
         LOGGER.log(CustomLoggingLevel.IMAGE_DEBUG, 'Start to read scan data.')
 
         # read all data to improve process speed
