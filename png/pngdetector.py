@@ -309,7 +309,7 @@ class PNGDetector():
             data = self.fileObject.read(self.fileObject.size - self.fileObject.cur())
             mpFileObject = FileObject(data)
             
-        else:
+        elif self.fileObject.size-self.fileObject.cur()>0:
             curStream = self.fileObject.cur()
             data = self.fileObject.read(self.fileObject.size - self.fileObject.cur())
             LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] > %s'%(curStream, data) )
