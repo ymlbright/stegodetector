@@ -8,6 +8,7 @@ from common.fileobject import FileObject
 from common.fastscan import fastscan
 from common.logger import *
 from common.imageshow import ImageShow
+from common.ascdetect import asc_detect
 from bmp.bmpdetector import BMPDetector
 from gif.gifdetector import GIFDetector
 from jpg.jpgdetector import JPGDetector
@@ -41,14 +42,17 @@ class StegoDetector():
         'gif': GIFDetector
         }
 
+    asciiDetectLength = 10
+
     # init detect params
-    def __init__(self, filePath='', reportLevel=1, logPath=False, detectSensitive=1.0, fileType='', fastMod=False):
+    def __init__(self, filePath='', reportLevel=1, logPath=False, detectSensitive=1.0, fileType='', fastMod=False, asciiDetectLength=10):
         self.filePath = filePath
         self.reportLevel = reportLevel
         self.logPath = logPath
         self.detectSensitive = detectSensitive
         self.fileType = fileType
         self.fastMod = fastMod
+        self.asciiDetectLength = asciiDetectLength
 
     # start to detect a image file
     def start(self):
@@ -70,6 +74,8 @@ class StegoDetector():
 
         fastscan(self.fileOject, self.fileType)
 
+        #asc_detect(self.filePath, self.asciiDetectLength)
+
         if not self.fastMod:
             imgDetector = self.mimeMap[self.fileType](self.fileOject)
             imageShow = ImageShow(imgDetector.detect())
@@ -89,5 +95,5 @@ class StegoDetector():
             # x.save('save.bmp', 'BMP')
             # do some check on rowdata
 
-t = StegoDetector(filePath='C:\\Users\\Brightx\\Desktop\\test\\!sctf.jpg', fileType='jpg')
+t = StegoDetector(filePath='E:\\Github\\stegodetector\\decodetest\\test\\01.jpg', fileType='jpg')
 t.start()

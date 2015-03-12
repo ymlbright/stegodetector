@@ -471,6 +471,8 @@ class JPGDetector():
                                         rowData[(heightIndex+k)*self.width+widthIndex+l] = [r, g, b]
             LOGGER.info('Please wait, decoding ... (%d/%d)'%(vb, vBlock))
         self.clean_bitstream_remainder()
+        if self.scanDataIndex < self.scanDataLength:
+            self.showextradata(''.join(self.scanData[self.scanDataIndex:]), self.scanDataPos + self.scanDataIndex)
         return rowData
 
     def round(self, x):
@@ -551,8 +553,6 @@ class JPGDetector():
                         else:
                             r += 0.25 * martrix[u*8+v] * idctCosTable[i][u] * idctCosTable[j][v]
                 dct.append(r)
-        if self.scanDataIndex < self.scanDataLength:
-            self.showextradata(self.scanData[self.scanDataIndex:], self.scanDataPos + self.scanDataIndex)
         return dct
 
     def read_bitstream(self, bitLength, changeFlag = False): 
