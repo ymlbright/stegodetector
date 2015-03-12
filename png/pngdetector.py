@@ -29,11 +29,17 @@ class PNGDetector():
         self.fileObject = fileObject
         self.streamCur = 0
         LOGGER.addHandler(stream_handler)
+        errorHandler.ignoreError = False
+        LOGGER.addHandler(errorHandler)
         self.headerInfo = {}
         self.FILE_END = 3
         self.FILE_LEGAL = 2
         self.FILE_OVER = 1
         self.chunk_count = {"IHDR":0,"IDAT":0,"PLTE":0,"IEND":0,"tRNS":0,"cHRM":0,"sRGB":0,"iCCP":0,"gAMA":0,"sBIT":0,"tEXt":0,"iTXt":0,"zTXt":0,"bKGD":0,"hIST":0,"pHYs":0,"sPLT":0,"tIME":0}
+        self.ImageExtraInfoLogCount = 0
+        self.ImageExtraDataStart = 0
+        self.ImageExtraDataEnd = 0
+        self.HasExtraData = False
 
 
     def isPng(self,fileObject):
@@ -67,7 +73,7 @@ class PNGDetector():
     def checkChunkIsValid(self,chunkInfo):
         names  =  self.chunk_count.keys()
         if chunkInfo['name'] not in names:
-            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,' At 0x%.8x,Chunk name %s isn\'t a valid chunk name'%(self.streamCur+4,chunkInfo['name']) )
+            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,'Chunk name %s isn\'t a valid chunk name,At 0x%.8x'%(chunkInfo['name'],self.streamCur+4) )
             return False
         else:
             self.chunk_count[chunkInfo['name']] += 1
@@ -75,6 +81,9 @@ class PNGDetector():
         # print hex(int(crc)),chunkInfo['crc']
         if hex(int(crc)) != chunkInfo['crc']:
             LOGGER.log(CustomLoggingLevel.IMAGE_INFO,'Not a valid crc value:%s at 0x%.8x'%(chunkInfo['crc'],self.streamCur+8+len(chunkInfo['data'])))
+        if self.HasExtraData:
+             LOGGER.log(CustomLoggingLevel.EXTRA_DATA,"Extra data at 0x%.8x - 0x%.8x"%(self.ImageExtraDataStart-4,self.ImageExtraDataEnd-4))
+        self.HasExtraData = False
         return True
 
     def checkReadValid(self,length):
@@ -83,7 +92,8 @@ class PNGDetector():
         elif self.fileObject.size >= self.fileObject.cur() + length:
             return self.FILE_LEGAL
         else:
-            raise IOError('Can\'t read 0x%x bytes from  0x%.8x'%(length,self.fileObject.cur()))
+            self.HasExtraData = True
+            raise IOError('Wrong chunk length  start at 0x%.8x'%(self.fileObject.cur()-4))
 
 
     def getChunkInfo(self):
@@ -91,13 +101,13 @@ class PNGDetector():
         try:
             self.checkReadValid(4)
             chunkInfo['length'] = struct.unpack('!I',self.fileObject.read(4))[0]
-        
+            self.checkReadValid(chunkInfo['length'])
 
             self.checkReadValid(4)
             chunkInfo['name'] = self.fileObject.read(4)
             
 
-            self.checkReadValid(chunkInfo['length'])
+            # self.checkReadValid(chunkInfo['length'])
             chunkInfo['data'] = self.fileObject.read(chunkInfo['length'])
             
 
@@ -121,7 +131,25 @@ class PNGDetector():
             #     self.streamCur = self.fileObject.cur()
 
         except IOError,e:
-            LOGGER.log(CustomLoggingLevel.IMAGE_INFO,e)
+
+            if self.ImageExtraInfoLogCount == 0:
+                LOGGER.log(CustomLoggingLevel.EXTRA_DATA,e)
+                self.ImageExtraInfoLogCount += 1
+            if self.ImageExtraDataStart == 0:
+                self.ImageExtraDataStart = self.fileObject.cur()
+            elif self.ImageExtraDataEnd == 0:
+                self.ImageExtraDataEnd = self.fileObject.cur() 
+                print 1,hex(self.ImageExtraDataEnd-4)
+            else:
+                if self.fileObject.cur()-self.ImageExtraDataEnd==1:
+                    self.ImageExtraDataEnd += 1
+                else:
+                    # LOGGER.log(CustomLoggingLevel.EXTRA_DATA,"Extra data at 0x%.8x - 0x%.8x"%(self.ImageExtraDataStart-4,self.ImageExtraDataEnd-4))
+                    self.ImageExtraDataEnd = 0
+                    self.ImageExtraDataStart = 0
+                    self.ImageExtraInfoLogCount = 0
+
+
             if self.fileObject.size >= self.streamCur :
                 self.streamCur += 1
                 self.fileObject.change_cur(self.streamCur)
@@ -276,8 +304,15 @@ class PNGDetector():
         return [RowData(rData, self.bpp, self.width, self.height)]
 
     def checkRedundancy(self):
-        if self.fileObject.size > self.fileObject.cur():
-            LOGGER.error("Find Redundancy data at 0x%.8x"%self.fileObject.cur())
+        if self.fileObject.size - self.fileObject.cur() > 128:
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s'%(self.fileObject.cur(), tmpFileObject.type()) )
+            data = self.fileObject.read(self.fileObject.size - self.fileObject.cur())
+            mpFileObject = FileObject(data)
+            
+        else:
+            curStream = self.fileObject.cur()
+            data = self.fileObject.read(self.fileObject.size - self.fileObject.cur())
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] > %s'%(curStream, data) )
             
     def parseChunk(self):
         chunk = self.getChunkInfo()
@@ -326,9 +361,10 @@ class PNGDetector():
 if __name__ == '__main__':
     png = PNGDetector(FileObject('../pic/png2.png'))
     show = ImageShow(png.detect())
+    # f = open('test2.dat')
     show.show()
     # show.show()
-    # img = Image.open("test.png")
+    # img = Image.open("../pic/png7.png")
     # print img
     # width,height = img.size
     # pix = img.load()

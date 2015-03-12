@@ -10,18 +10,18 @@ except:
 
 
 class ImageShow():
-    def __init__(pic,picArray):
+    def __init__(self,picArray):
         LOGGER.addHandler(stream_handler)
-        pic.picArray = picArray       
+        self.picArray = picArray       
        
 
-    def show(pic):
-        if len(pic.picArray)==0:
+    def show(self):
+        if len(self.picArray)==0:
             LOGGER.error("no picture data")
             return
         LOGGER.info("Showing picture...")
-        for pic in pic.picArray:
-            img = Image.new("RGBA", (pic.width,pic.height))
+        for pic in self.picArray:
+            img = Image.new("RGBA", (pic.width,pic.height),'white')
             pix = img.load()
             if pic.channel == 4 : #RGBA
                 for y in range(0,pic.height):
@@ -41,7 +41,7 @@ class ImageShow():
                         pix[x,y] = (value,value,value)
             img.show()
 
-    def save(pic,name):
+    def save(self,name):
         pic.image.save(name)
 
 
