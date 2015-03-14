@@ -40,6 +40,97 @@ class PNGDetector():
         self.ImageExtraDataStart = 0
         self.ImageExtraDataEnd = 0
         self.HasExtraData = False
+        # self.iterlaceTable = [[1,6,4,6,2,6,4,6],
+        #                       [7,7,7,7,7,7,7,7],
+        #                       [5,6,5,6,5,6,5,6],
+        #                       [7,7,7,7,7,7,7,7],
+        #                       [3,6,4,6,3,6,4,6],
+        #                       [7,7,7,7,7,7,7,7],
+        #                       [5,6,5,6,5,6,5,6],
+        #                       [7,7,7,7,7,7,7,7]
+        #                     ]
+        self._adam7 = ((0, 0, 8, 8),
+                       (4, 0, 8, 8),
+                       (0, 4, 4, 8),
+                       (2, 0, 4, 4),
+                       (0, 2, 2, 4),
+                       (1, 0, 2, 2),
+                       (0, 1, 1, 2))
+
+
+    def deinterlace(self, raw):
+        """
+        Read raw pixel data, undo filters, deinterlace, and flatten.
+        Return in flat row flat pixel format.
+        """
+
+        # print >> sys.stderr, ("Reading interlaced, w=%s, r=%s, planes=%s," +
+        #     " bpp=%s") % (self.width, self.height, self.planes, self.bps)
+        
+        flt_list = [self.ifilter0, self.ifilter1, self.ifilter2, self.ifilter3, self.ifilter4]
+        # Values per row (of the target image)
+        vpr = self.width * self.bpp
+
+        # Make a result array, and make it big enough.  Interleaving
+        # writes to the output array randomly (well, not quite), so the
+        # entire output array must be in memory.
+        # fmt = 'BH'[self.bitdepth > 8]
+        # a = array(fmt, [0]*vpr*self.height)
+        source_offset = 0
+
+        # after = [[0]*vpr] * self.height
+        after = []
+        for i in range(self.height):
+            after.append([0]*vpr)
+     
+        for xstart, ystart, xstep, ystep in self._adam7:
+            
+            if xstart >= self.width:
+                continue
+           
+            # Pixels per row (reduced pass image)
+            ppr = int(math.ceil((self.width-xstart)/float(xstep)))
+            row_size = int(math.ceil(self.bpp * ppr))
+            recon = [0] * row_size
+            for y in range(ystart, self.height, ystep):
+                filter_type = raw[source_offset]
+                source_offset += 1
+                scanline  = [ord(b) for b in  raw[source_offset:source_offset+row_size]]
+                source_offset += row_size
+                recon = flt_list[ord(filter_type)](scanline,recon,self.bpp)
+                if xstep == 1 and xstart==0:
+                    after[y][0:vpr] = recon[0:vpr]
+                else:
+                    reconIndex = 0
+                    for xpos in range(xstart,self.width,xstep):
+                        after[y][xpos*self.bpp:xpos*self.bpp+self.bpp] = recon[reconIndex*self.bpp:reconIndex*self.bpp+self.bpp]
+                        reconIndex += 1
+      
+        return after
+
+    def checkInterlaceMethod1(self,data):
+        totalSum = 0
+        for xstart,ystart,xstep,ystep in self._adam7:
+            passPixels = math.ceil((self.width-xstart)/float(xstep))
+            rowBytes = passPixels * self.bpp + 1
+            t_sum = 0
+            for y in range(ystart,self.height,ystep):
+                t_sum += rowBytes 
+            totalSum += t_sum
+        if totalSum < len(data):
+            self.checkFileType(totalSum, data[totalSum:len(data)])
+
+    def checkIterlaceMethod0(self,data):
+        totalSum = (self.width * self.bpp + 1) * self.height
+        if totalSum < len(data):
+            self.checkFileType(totalSum, data[totalSum:len(data)])
+
+    def checkFileType(self,curStream,data):
+        if len(data) <= 128:
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, 'In IDAT decompress data at [0x%.8x] %s'%(curStream,data) )
+        else:
+            tmpFileObject = FileObject(data)
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, 'In IDAT decompress data at [0x%.8x] %s'%(curStream, tmpFileObject.type()) )
 
 
     def isPng(self,fileObject):
@@ -139,7 +230,7 @@ class PNGDetector():
                 self.ImageExtraDataStart = self.fileObject.cur()
             elif self.ImageExtraDataEnd == 0:
                 self.ImageExtraDataEnd = self.fileObject.cur() 
-                print 1,hex(self.ImageExtraDataEnd-4)
+                # print 1,hex(self.ImageExtraDataEnd-4)
             else:
                 if self.fileObject.cur()-self.ImageExtraDataEnd==1:
                     self.ImageExtraDataEnd += 1
@@ -229,6 +320,7 @@ class PNGDetector():
         for k in range(height):
             after.append([ord(b) for b in before[(k*(width+1)+1):((k+1)*(width+1))]])
             flt_type[k] = ord(before[k * (width+1)])
+        # print flt_type
         after[0]= flt_list[flt_type[0]](after[0], [0] * width, self.bpp)
         for k in range(1, height):
             after[k] = flt_list[flt_type[k]](after[k], after[k-1], self.bpp)
@@ -305,14 +397,15 @@ class PNGDetector():
 
     def checkRedundancy(self):
         if self.fileObject.size - self.fileObject.cur() > 128:
-            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] %s'%(self.fileObject.cur(), tmpFileObject.type()) )
+            curStream = self.fileObject.cur()
             data = self.fileObject.read(self.fileObject.size - self.fileObject.cur())
-            mpFileObject = FileObject(data)
+            tmpFileObject = FileObject(data)
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] ,filetype is %s'%(curStream, tmpFileObject.type()) )
             
         elif self.fileObject.size-self.fileObject.cur()>0:
             curStream = self.fileObject.cur()
             data = self.fileObject.read(self.fileObject.size - self.fileObject.cur())
-            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] > %s'%(curStream, data) )
+            LOGGER.log(CustomLoggingLevel.EXTRA_DATA, '[0x%x] ,data is  %s'%(curStream, data) )
             
     def parseChunk(self):
         chunk = self.getChunkInfo()
@@ -333,6 +426,7 @@ class PNGDetector():
             if chunk['name']=='IEND':
                 self.checkRedundancy()
 
+
             chunk = self.getChunkInfo()
 
         #print the chunk info
@@ -342,24 +436,35 @@ class PNGDetector():
             if name=='IHDR':
                 LOGGER.info('PNG Image Header Info:\n' + str(self.headerInfo))
     def getPicPixels(self):
-        decData = self.decompress( cStringIO.StringIO(self.data))
+        # print len(self.data)
+        decData = self.decompress(cStringIO.StringIO(self.data))
+        # f = open('data.dat','w')
+        # f.write(decData[0x280bf6:len(decData)])
+        # f.close()
+        #self.testShow(decDatab)
+        # print len(decData)
+
         self.calcBytesPerPixel()
-        return self.ifilter(decData)
+        if self.headerInfo['interlace method'] == 0 :
+            self.checkIterlaceMethod0(decData)
+            return self.ifilter(decData)
+        else :
+            self.checkInterlaceMethod1(decData)
+            return self.deinterlace(decData)
 
     def detect(self):
         self.isPng(self.fileObject)
         self.parseChunk()
         data_mtx = self.getPicPixels()
-        
+        # f = open('test1.dat','w')
+        # f.write(data_mtx)
+        # f.close()
         return  self.result(data_mtx)
-
-       
-
-         
 
 
 if __name__ == '__main__':
-    png = PNGDetector(FileObject('../pic/png2.png'))
+    png = PNGDetector(FileObject('../pic/!final.png'))
+    # png = PNGDetector(FileObject('../pic/png2.png'))
     show = ImageShow(png.detect())
     # f = open('test2.dat')
     show.show()
