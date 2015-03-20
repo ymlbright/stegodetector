@@ -197,29 +197,18 @@ class PNGDetector():
             self.checkReadValid(4)
             chunkInfo['name'] = self.fileObject.read(4)
             
-
             # self.checkReadValid(chunkInfo['length'])
             chunkInfo['data'] = self.fileObject.read(chunkInfo['length'])
-            
 
             self.checkReadValid(4)
             chunkInfo['crc'] = hex(struct.unpack('!I',self.fileObject.read(4))[0])
             if not self.checkChunkIsValid(chunkInfo):
                 self.streamCur += 1
                 self.fileObject.change_cur(self.streamCur)
-                self.getChunkInfo()
+                return self.getChunkInfo()
             else:
                 self.streamCur = self.fileObject.cur()
-            # LOGGER.info("fileObject stream is 0x%.8x"%(self.fileObject.cur()))
-            # LOGGER.info("self file stream is 0x%.8x"%(self.streamCur))
-            # checkResult = self.checkChunkIsValid(chunkInfo)
-            # if  checkResult==False :
-            #     self.streamCur += 1
-            #     self.fileObject.change_cur(self.streamCur)
-            #     self.getChunkInfo()
-            # elif checkResult==True:
-            #     # LOGGER.info("cur() :  %x"%self.fileObject.cur())
-            #     self.streamCur = self.fileObject.cur()
+                return chunkInfo
 
         except IOError,e:
 
@@ -230,22 +219,20 @@ class PNGDetector():
                 self.ImageExtraDataStart = self.fileObject.cur()
             elif self.ImageExtraDataEnd == 0:
                 self.ImageExtraDataEnd = self.fileObject.cur() 
-                # print 1,hex(self.ImageExtraDataEnd-4)
             else:
                 if self.fileObject.cur()-self.ImageExtraDataEnd==1:
                     self.ImageExtraDataEnd += 1
                 else:
-                    # LOGGER.log(CustomLoggingLevel.EXTRA_DATA,"Extra data at 0x%.8x - 0x%.8x"%(self.ImageExtraDataStart-4,self.ImageExtraDataEnd-4))
                     self.ImageExtraDataEnd = 0
                     self.ImageExtraDataStart = 0
                     self.ImageExtraInfoLogCount = 0
-
-
             if self.fileObject.size >= self.streamCur :
                 self.streamCur += 1
                 self.fileObject.change_cur(self.streamCur)
-                self.getChunkInfo()
+                return self.getChunkInfo()
         except struct.error,e:
+            pass
+        except Exception,e:
             pass
         return chunkInfo
 
@@ -370,6 +357,10 @@ class PNGDetector():
         return mtx
 
     def decompress(self,f):
+        out = open('output/zip.dat','w')
+        out.write(f.getvalue())
+        out.close()
+
         z = zlib.decompressobj()
         t=''
         while True:
@@ -463,7 +454,7 @@ class PNGDetector():
 
 
 if __name__ == '__main__':
-    png = PNGDetector(FileObject('../pic/!final.png'))
+    png = PNGDetector(FileObject('../pic/steg.png'))
     # png = PNGDetector(FileObject('../pic/png2.png'))
     show = ImageShow(png.detect())
     # f = open('test2.dat')
