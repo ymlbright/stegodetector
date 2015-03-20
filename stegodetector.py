@@ -74,7 +74,7 @@ class StegoDetector():
 
         fastscan(self.fileOject, self.fileType)
 
-        asc_detect(self.filePath, self.asciiDetectLength)
+        #asc_detect(self.filePath, self.asciiDetectLength)
 
         if not self.fastMod:
             imgDetector = self.mimeMap[self.fileType](self.fileOject)
@@ -95,5 +95,5 @@ class StegoDetector():
             # x.save('save.bmp', 'BMP')
             # do some check on rowdata
 
-t = StegoDetector(filePath='!index.jpg', fileType='jpg')
+t = StegoDetector(filePath='E:\\Github\\stegodetector\\decodetest\\test\\!test4127.png', fileType='png')
 t.start()
