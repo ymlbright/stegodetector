@@ -454,11 +454,11 @@ class PNGDetector():
 
 
 if __name__ == '__main__':
-    png = PNGDetector(FileObject('../pic/steg.png'))
+    png = PNGDetector(FileObject('../pic/png1.png'))
     # png = PNGDetector(FileObject('../pic/png2.png'))
     show = ImageShow(png.detect())
     # f = open('test2.dat')
-    show.show()
+    show.show('rgb,all')
     # show.show()
     # img = Image.open("../pic/png7.png")
     # print img

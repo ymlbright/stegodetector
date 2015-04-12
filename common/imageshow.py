@@ -26,7 +26,7 @@ class ImageShow():
 
        
 
-    def show(self):
+    def show(self,order='all'):
         if len(self.picArray)==0:
             LOGGER.error("no picture data")
             return
@@ -51,10 +51,70 @@ class ImageShow():
                         pos = x * pic.channel
                         value = pic.rowData[y*pic.width+x][0]
                         pix[x,y] = (value,value,value)
-            img.save(self.outputPath +'\\'+'tmp'+str(self.index)+'.png')
-            webbrowser.open(self.outputPath +'\\'+'tmp'+str(self.index)+'.png')
+            if pic.channel > 1:
+                orderList = order.split(',')
+                for tmpOrder in orderList:
+                    if len(tmpOrder)>pic.channel:
+                        LOGGER.error("Img only has %d channels and you wan't to show %d"%(pic.channel,len(tmpOrder)))
+                galletyData = self.splitGallery(img, pic.channel)
+                self.showGallery(galletyData,order)
+            else:
+                tmpSaveName = self.outputPath +'\\'+'tmp'+str(self.index)+'.png'
+                img.save(tmpSaveName)
+                webbrowser.open(tmpSaveName)
             self.index += 1
+            # img.save(self.outputPath +'\\'+'tmp'+str(self.index)+'.png')
+            # webbrowser.open(self.outputPath +'\\'+'tmp'+str(self.index)+'.png')
+            # self.index += 1
+    def openAndShow(self,filename):
+        webbrowser.open(filename)
 
+    def splitGallery(self,img,channel):
+        
+        if channel == 4:
+            rgba = img.split()
+            return (rgba,'rgba')
+        elif channel == 3:
+            r,g,b,a = img.split()
+            return ((r,g,b),'rgb')
+
+    def showGallery(self,gallery,showOrder):
+        galleryIndex = {'r':0,'g':1,'b':2,'a':3}
+        length = gallery[0][0].size[0]*gallery[0][0].size[1]
+        chunkData = [0]*length
+        alphaChunkData = [255]*length
+        chunkImg = Image.new("L", gallery[0][0].size)
+        chunkImg.putdata(chunkData)
+       
+
+        orderList = showOrder.split(",")
+        for order in orderList:
+            if order == 'all':
+                # print gallery[1],gallery[0]
+                im = Image.merge(gallery[1].upper(), gallery[0])
+                tmpSaveName = self.outputPath +'\\'+'tmp'+str(self.index)+'_all.png'
+                im = im.convert("RGB")
+                im.save(tmpSaveName)
+                self.openAndShow(tmpSaveName)
+            else:
+                for imgpass in order:
+                    galleryData ={'r':chunkImg,'g':chunkImg,'b':chunkImg}
+                    if imgpass in galleryIndex:
+                        if imgpass!='a':
+                            tmpSaveName = self.outputPath +'\\'+'tmp'+str(self.index)+'_'+str(imgpass)+'.png'
+                            # print imgpass,galleryIndex[imgpass]
+                            # gallery[0][galleryIndex[imgpass]].save(tmpSaveName)
+                            galleryData[imgpass] = gallery[0][galleryIndex[imgpass]]
+                            im = Image.merge("RGB", (galleryData['r'],galleryData['g'],galleryData['b']))
+                            # im = gallery[0][galleryIndex[imgpass]].convert("RGBA")
+                            im.save(tmpSaveName)
+                            self.openAndShow(tmpSaveName)
+                        else:
+                            tmpSaveName = self.outputPath +'\\'+'tmp'+str(self.index)+'_'+str(imgpass)+'.png'
+                            gallery[0][galleryIndex[imgpass]].save(tmpSaveName)
+                            self.openAndShow(tmpSaveName)
+                    else:
+                        LOGGER.error("Order %s not in %s"%(imgpass,gallery[1]))
 
     def save(self,name):
         if len(self.picArray)==0:

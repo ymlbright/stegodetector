@@ -9,4 +9,5 @@ class RowData():
         self.channel = channel
         self.width = width
         self.height = height
+       
 
